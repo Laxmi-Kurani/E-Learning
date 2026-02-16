@@ -32,6 +32,43 @@ router.post('/submit', verifyToken, async (req, res) => {
   }
 });
 
+// Submit assessment - frontend compatibility endpoint
+router.post('/add/:userId/:courseId', verifyToken, async (req, res) => {
+  try {
+    const { marks } = req.body;
+    const { userId, courseId } = req.params;
+    
+    // Verify the user is submitting their own assessment
+    if (parseInt(userId) !== req.userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+    
+    const passed = marks >= 70; // 70% passing grade
+    
+    const [result] = await db.query(
+      'INSERT INTO assessment (user_id, course_id, score, total_questions, passed) VALUES (?, ?, ?, ?, ?)',
+      [userId, courseId, marks, 100, passed]
+    );
+
+    // Update progress to 100% if passed
+    if (passed) {
+      await db.query(
+        'UPDATE progress SET completion_percentage=100, completed=true WHERE user_id=? AND course_id=?',
+        [userId, courseId]
+      );
+    }
+
+    res.status(201).json({ 
+      message: 'Assessment submitted successfully', 
+      assessmentId: result.insertId,
+      passed 
+    });
+  } catch (error) {
+    console.error('Error submitting assessment:', error);
+    res.status(500).json({ message: 'Error submitting assessment', error: error.message });
+  }
+});
+
 // Get user assessments
 router.get('/my-assessments', verifyToken, async (req, res) => {
   try {
