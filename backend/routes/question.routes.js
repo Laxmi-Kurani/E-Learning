@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // Get questions for a course
 router.get('/course/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [questions] = await db.query('SELECT * FROM question WHERE course_id = ?', [req.params.courseId]);
     res.json(questions);
   } catch (error) {
@@ -16,6 +17,7 @@ router.get('/course/:courseId', verifyToken, async (req, res) => {
 // Create question (Admin only)
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { courseId, questionText, optionA, optionB, optionC, optionD, correctAnswer } = req.body;
     
     const [result] = await db.query(
@@ -32,6 +34,7 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 // Update question (Admin only)
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { questionText, optionA, optionB, optionC, optionD, correctAnswer } = req.body;
     
     await db.query(
@@ -48,6 +51,7 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 // Delete question (Admin only)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     await db.query('DELETE FROM question WHERE id = ?', [req.params.id]);
     res.json({ message: 'Question deleted successfully' });
   } catch (error) {

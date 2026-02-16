@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 
 // Register
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    const db = getPool();
     
     const hashedPassword = await bcrypt.hash(password, 10);
     
@@ -29,6 +30,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const db = getPool();
 
     const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
     

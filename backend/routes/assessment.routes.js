@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
 // Submit assessment
 router.post('/submit', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { courseId, score, totalQuestions } = req.body;
     const passed = (score / totalQuestions) >= 0.7; // 70% passing grade
     
@@ -35,6 +36,7 @@ router.post('/submit', verifyToken, async (req, res) => {
 // Get user assessments
 router.get('/my-assessments', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [assessments] = await db.query(
       `SELECT a.*, c.title as course_title 
        FROM assessment a 
@@ -52,6 +54,7 @@ router.get('/my-assessments', verifyToken, async (req, res) => {
 // Get assessment for a course
 router.get('/course/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [assessments] = await db.query(
       'SELECT * FROM assessment WHERE user_id = ? AND course_id = ? ORDER BY completed_at DESC LIMIT 1',
       [req.userId, req.params.courseId]
@@ -70,6 +73,7 @@ router.get('/course/:courseId', verifyToken, async (req, res) => {
 // Get performance data for user
 router.get('/performance/:userId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     // Get all assessments with course details
     const [assessments] = await db.query(
       `SELECT a.*, c.title as course_title, c.category

@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // Get all enrollments (Admin only)
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const [enrollments] = await db.query(
       `SELECT l.*, u.username, u.email, c.title as course_title
        FROM learning l 
@@ -22,6 +23,7 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
 // Enroll in course (creates pending request)
 router.post('/enroll', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { courseId } = req.body;
     
     // Create enrollment with PENDING status
@@ -39,6 +41,7 @@ router.post('/enroll', verifyToken, async (req, res) => {
 // Get user enrollments (only approved)
 router.get('/my-courses', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [courses] = await db.query(
       `SELECT c.*, l.enrolled_at, l.status, l.approved_at, p.completion_percentage, p.completed 
        FROM learning l 
@@ -56,6 +59,7 @@ router.get('/my-courses', verifyToken, async (req, res) => {
 // Get pending enrollment requests (Admin only)
 router.get('/pending', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const [requests] = await db.query(
       `SELECT l.*, u.username, u.email, c.title as course_title
        FROM learning l 
@@ -73,6 +77,7 @@ router.get('/pending', verifyToken, isAdmin, async (req, res) => {
 // Approve enrollment (Admin only)
 router.put('/approve/:enrollmentId', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     // Update enrollment status to APPROVED
     await db.query(
       'UPDATE learning SET status=?, approved_at=NOW(), approved_by=? WHERE id=?',
@@ -101,6 +106,7 @@ router.put('/approve/:enrollmentId', verifyToken, isAdmin, async (req, res) => {
 // Reject enrollment (Admin only)
 router.put('/reject/:enrollmentId', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     await db.query(
       'UPDATE learning SET status=?, approved_at=NOW(), approved_by=? WHERE id=?',
       ['REJECTED', req.userId, req.params.enrollmentId]
@@ -115,6 +121,7 @@ router.put('/reject/:enrollmentId', verifyToken, isAdmin, async (req, res) => {
 // Check enrollment status
 router.get('/check/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [result] = await db.query(
       'SELECT * FROM learning WHERE user_id = ? AND course_id = ?',
       [req.userId, req.params.courseId]

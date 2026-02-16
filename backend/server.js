@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const db = require('./config/database');
+const { setupPool, getPool } = require('./config/database');
 const bcrypt = require('bcryptjs');
 
 const app = express();
@@ -14,15 +14,24 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize database tables
+// Initialize database tables and admin user
 const initTables = async () => {
   try {
+    const db = getPool();
+    
     const sqlFile = fs.readFileSync(path.join(__dirname, 'config', 'tables.sql'), 'utf8');
     const statements = sqlFile.split(';').filter(stmt => stmt.trim());
     
     for (const statement of statements) {
       if (statement.trim()) {
-        await db.query(statement);
+        try {
+          await db.query(statement);
+        } catch (error) {
+          // Ignore "table already exists" errors
+          if (error.code !== 'ER_TABLE_EXISTS_ERROR') {
+            console.error('Error executing SQL:', error.message);
+          }
+        }
       }
     }
     
@@ -37,7 +46,11 @@ const initTables = async () => {
         'INSERT INTO user (username, email, password, role) VALUES (?, ?, ?, ?)',
         ['admin', process.env.ADMIN_EMAIL, hashedPassword, 'ADMIN']
       );
-      console.log('Default admin user created');
+      console.log('✅ Default admin user created');
+      console.log(`📧 Admin Email: ${process.env.ADMIN_EMAIL}`);
+      console.log(`🔑 Admin Password: ${process.env.ADMIN_PASSWORD}`);
+    } else {
+      console.log('ℹ️ Admin user already exists');
     }
   } catch (error) {
     console.error('Error initializing tables:', error);
@@ -69,9 +82,22 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 8080;
 
-initTables().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`API Documentation: http://localhost:${PORT}/api/health`);
-  });
-});
+(async () => {
+  try {
+    // Setup database pool first
+    const db = await setupPool();
+    console.log('✅ Database connection established');
+    
+    // Initialize tables and admin user
+    await initTables();
+    
+    // Start listening after everything is ready
+    app.listen(PORT, () => {
+      console.log('🚀 Server is running on port ' + PORT);
+      console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
+})();
