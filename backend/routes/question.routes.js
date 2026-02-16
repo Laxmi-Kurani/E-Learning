@@ -6,9 +6,16 @@ const { verifyToken, isAdmin } = require('../middleware/auth');
 // Get questions for a course
 router.get('/course/:courseId', verifyToken, async (req, res) => {
   try {
-    const [questions] = await db.query('SELECT * FROM question WHERE course_id = ?', [req.params.courseId]);
+    const [questions] = await db.query(
+      `SELECT id, course_id, question_text as question, 
+       option_a as option1, option_b as option2, option_c as option3, option_d as option4, 
+       correct_answer as answer 
+       FROM question WHERE course_id = ?`, 
+      [req.params.courseId]
+    );
     res.json(questions);
   } catch (error) {
+    console.error('Error fetching questions:', error);
     res.status(500).json({ message: 'Error fetching questions', error: error.message });
   }
 });
