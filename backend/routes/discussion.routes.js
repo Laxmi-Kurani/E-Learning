@@ -26,7 +26,7 @@ router.get('/:courseId', async (req, res) => {
   try {
     const db = getPool();
     const [discussions] = await db.query(
-      `SELECT d.*, u.username, u.email 
+      `SELECT d.id, d.message as content, d.created_at as time, u.username as userName, u.email 
        FROM discussion d 
        JOIN user u ON d.user_id = u.id 
        WHERE d.course_id = ? 
@@ -35,6 +35,7 @@ router.get('/:courseId', async (req, res) => {
     );
     res.json(discussions);
   } catch (error) {
+    console.error('Error fetching discussions:', error);
     res.status(500).json({ message: 'Error fetching discussions', error: error.message });
   }
 });
@@ -60,15 +61,24 @@ router.post('/', verifyToken, async (req, res) => {
 router.post('/addMessage', verifyToken, async (req, res) => {
   try {
     const db = getPool();
-    const { courseId, message } = req.body;
+    const { course_id, content, name } = req.body;
     
     const [result] = await db.query(
       'INSERT INTO discussion (user_id, course_id, message) VALUES (?, ?, ?)',
-      [req.userId, courseId, message]
+      [req.userId, course_id, content]
     );
 
-    res.status(201).json({ message: 'Discussion posted successfully', discussionId: result.insertId });
+    // Return the newly created message in the format the frontend expects
+    const newMessage = {
+      id: result.insertId,
+      userName: name,
+      content: content,
+      time: new Date().toISOString()
+    };
+
+    res.status(201).json(newMessage);
   } catch (error) {
+    console.error('Error posting discussion:', error);
     res.status(500).json({ message: 'Error posting discussion', error: error.message });
   }
 });

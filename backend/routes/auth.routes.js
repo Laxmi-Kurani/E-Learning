@@ -7,22 +7,34 @@ const { getPool } = require('../config/database');
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { 
+      username, 
+      email, 
+      password, 
+      mobileNumber, 
+      dob, 
+      gender, 
+      location, 
+      profession, 
+      linkedin_url, 
+      github_url 
+    } = req.body;
     const db = getPool();
     
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const [result] = await db.query(
-      'INSERT INTO user (username, email, password, role) VALUES (?, ?, ?, ?)',
-      [username, email, hashedPassword, 'USER']
+      `INSERT INTO user (username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, email, hashedPassword, mobileNumber || null, dob || null, gender || null, location || null, profession || null, linkedin_url || null, github_url || null, 'USER']
     );
 
     res.status(201).json({ message: 'User registered successfully', userId: result.insertId });
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ error: 'Email already exists' });
     }
-    res.status(500).json({ message: 'Registration failed', error: error.message });
+    res.status(500).json({ error: 'Registration failed', message: error.message });
   }
 });
 
