@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
 // Update progress
 router.post('/update', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { courseId, completionPercentage } = req.body;
     const completed = completionPercentage >= 100;
     
@@ -23,6 +24,7 @@ router.post('/update', verifyToken, async (req, res) => {
 // Get user progress for a course
 router.get('/:userId/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [progress] = await db.query(
       'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
       [req.params.userId, req.params.courseId]
@@ -41,6 +43,7 @@ router.get('/:userId/:courseId', verifyToken, async (req, res) => {
 // Get user progress for a course (alternative route using token)
 router.get('/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [progress] = await db.query(
       'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
       [req.userId, req.params.courseId]
@@ -59,6 +62,7 @@ router.get('/:courseId', verifyToken, async (req, res) => {
 // Get all user progress
 router.get('/', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [progress] = await db.query(
       `SELECT p.*, c.title as course_title 
        FROM progress p 

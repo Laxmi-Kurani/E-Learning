@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // Get all courses
 router.get('/', async (req, res) => {
   try {
+    const db = getPool();
     const [courses] = await db.query('SELECT * FROM course ORDER BY created_at DESC');
     res.json(courses);
   } catch (error) {
@@ -16,6 +17,7 @@ router.get('/', async (req, res) => {
 // Get course by ID
 router.get('/:id', async (req, res) => {
   try {
+    const db = getPool();
     const [courses] = await db.query('SELECT * FROM course WHERE id = ?', [req.params.id]);
     if (courses.length === 0) {
       return res.status(404).json({ message: 'Course not found' });
@@ -29,6 +31,7 @@ router.get('/:id', async (req, res) => {
 // Create course (Admin only)
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { title, description, instructor, duration, level, category, image_url, video_url, price } = req.body;
     
     const [result] = await db.query(
@@ -45,6 +48,7 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 // Update course (Admin only)
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { title, description, instructor, duration, level, category, image_url, video_url, price } = req.body;
     
     await db.query(
@@ -61,6 +65,7 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 // Delete course (Admin only)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     await db.query('DELETE FROM course WHERE id = ?', [req.params.id]);
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {

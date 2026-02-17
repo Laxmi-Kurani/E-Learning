@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
 // Get discussions for a course - support both endpoints
 router.get('/course/:courseId', async (req, res) => {
   try {
+    const db = getPool();
     const [discussions] = await db.query(
       `SELECT d.*, u.username, u.email 
        FROM discussion d 
@@ -23,6 +24,7 @@ router.get('/course/:courseId', async (req, res) => {
 // Get discussions by courseId directly (frontend compatibility)
 router.get('/:courseId', async (req, res) => {
   try {
+    const db = getPool();
     const [discussions] = await db.query(
       `SELECT d.id, d.message as content, d.created_at as time, u.username as userName, u.email 
        FROM discussion d 
@@ -41,6 +43,7 @@ router.get('/:courseId', async (req, res) => {
 // Create discussion - support both endpoints
 router.post('/', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { courseId, message } = req.body;
     
     const [result] = await db.query(
@@ -57,6 +60,7 @@ router.post('/', verifyToken, async (req, res) => {
 // Create discussion - addMessage endpoint (frontend compatibility)
 router.post('/addMessage', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { course_id, content, name } = req.body;
     
     const [result] = await db.query(
@@ -82,6 +86,7 @@ router.post('/addMessage', verifyToken, async (req, res) => {
 // Delete discussion
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [discussions] = await db.query('SELECT user_id FROM discussion WHERE id = ?', [req.params.id]);
     
     if (discussions.length === 0) {

@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
 // Get feedback for a course (by course ID)
 router.get('/:courseId', async (req, res) => {
   try {
+    const db = getPool();
     const [feedback] = await db.query(
       `SELECT f.*, u.username 
        FROM feedback f 
@@ -23,6 +24,7 @@ router.get('/:courseId', async (req, res) => {
 // Get feedback for a course (alternative route)
 router.get('/course/:courseId', async (req, res) => {
   try {
+    const db = getPool();
     const [feedback] = await db.query(
       `SELECT f.*, u.username 
        FROM feedback f 
@@ -40,6 +42,7 @@ router.get('/course/:courseId', async (req, res) => {
 // Create feedback
 router.post('/', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { course_id, rating, comment } = req.body;
     
     // Support both courseId and course_id
@@ -59,6 +62,7 @@ router.post('/', verifyToken, async (req, res) => {
 // Get average rating for a course
 router.get('/rating/:courseId', async (req, res) => {
   try {
+    const db = getPool();
     const [result] = await db.query(
       'SELECT AVG(rating) as average_rating, COUNT(*) as total_reviews FROM feedback WHERE course_id = ?',
       [req.params.courseId]

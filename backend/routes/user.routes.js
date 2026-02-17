@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/database');
+const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
 // Get all users (Admin only)
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const [users] = await db.query('SELECT id, username, email, role, created_at FROM user');
     res.json(users);
   } catch (error) {
@@ -17,6 +18,7 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
 // Get user profile (must come before /:id route)
 router.get('/profile', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [users] = await db.query('SELECT id, username, email, role, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', [req.userId]);
     if (users.length === 0) {
       return res.status(404).json({ message: 'User not found' });
@@ -30,6 +32,7 @@ router.get('/profile', verifyToken, async (req, res) => {
 // Update user profile (must come before /:id route)
 router.put('/profile', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { username, email, mobileNumber, gender, dob, profession, location, linkedin_url, github_url } = req.body;
     
     // Build dynamic update query based on provided fields
@@ -62,6 +65,7 @@ router.put('/profile', verifyToken, async (req, res) => {
 // Change password (must come before /:id route)
 router.put('/change-password', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { oldPassword, newPassword } = req.body;
     
     const [users] = await db.query('SELECT password FROM user WHERE id = ?', [req.userId]);
@@ -83,6 +87,7 @@ router.put('/change-password', verifyToken, async (req, res) => {
 // Get dashboard statistics (Admin only) - MUST come before /:id route
 router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     // Get total users
     const [userCount] = await db.query('SELECT COUNT(*) as count FROM user WHERE role = ?', ['USER']);
     
@@ -129,6 +134,7 @@ router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
 // Get user by ID
 router.get('/:id', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [users] = await db.query(
       'SELECT id, username, email, role, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', 
       [req.params.id]
@@ -145,6 +151,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 // Get profile image (must come before /:id route)
 router.get('/:id/profile-image', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const [users] = await db.query('SELECT profile_image FROM user WHERE id = ?', [req.params.id]);
     
     if (users.length === 0 || !users[0].profile_image) {
@@ -174,6 +181,7 @@ router.get('/:id/profile-image', verifyToken, async (req, res) => {
 // Upload profile image (must come before /:id route)
 router.post('/:id/upload-image', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { imageData } = req.body;
     
     if (!imageData) {
@@ -202,6 +210,7 @@ router.post('/:id/upload-image', verifyToken, async (req, res) => {
 // Update user by ID
 router.put('/:id', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { username, email, mobileNumber, gender, dob, profession, location, linkedin_url, github_url } = req.body;
     
     // Build dynamic update query based on provided fields
@@ -234,6 +243,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 // Delete user (Admin only)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     // Prevent admin from deleting themselves
     if (parseInt(req.params.id) === req.userId) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
@@ -249,6 +259,7 @@ router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
 // Promote user to admin (Admin only)
 router.put('/:id/promote', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     await db.query('UPDATE user SET role = ? WHERE id = ?', ['ADMIN', req.params.id]);
     res.json({ message: 'User promoted to admin successfully' });
   } catch (error) {
@@ -259,6 +270,7 @@ router.put('/:id/promote', verifyToken, isAdmin, async (req, res) => {
 // Demote admin to user (Admin only)
 router.put('/:id/demote', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     // Prevent admin from demoting themselves
     if (parseInt(req.params.id) === req.userId) {
       return res.status(400).json({ message: 'Cannot demote yourself' });
