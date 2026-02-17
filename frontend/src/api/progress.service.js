@@ -3,7 +3,9 @@ import api from "./api";
 async function getProgress(userId, courseId) {
   try {
     const { data } = await api.get(`/api/progress/${userId}/${courseId}`);
-    return { success: true, data };
+    // Return played time (completion_percentage converted back to seconds if needed)
+    // For now, return completion_percentage as the progress value
+    return { success: true, data: data.completion_percentage || 0 };
   } catch (err) {
     console.error("Error fetching progress:", err);
     return { success: false, error: err.response?.data?.message || "Unable to fetch progress" };
