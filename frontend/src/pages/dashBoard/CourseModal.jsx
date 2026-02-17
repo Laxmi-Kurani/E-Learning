@@ -215,8 +215,9 @@ function CourseModal({ isOpen, onClose, onSuccess, courseId = null, mode = "add"
               { required: true, message: "Video URL is required" },
               { type: "url", message: "Please enter a valid URL" },
             ]}
+            tooltip="Supports YouTube, Vimeo, Dailymotion, SoundCloud, Streamable, Wistia, Twitch, Facebook, and direct video files (.mp4, .webm, .ogv)"
           >
-            <Input placeholder="https://example.com/video" />
+            <Input placeholder="https://www.youtube.com/watch?v=..." />
           </Form.Item>
 
           <Form.Item

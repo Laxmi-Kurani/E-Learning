@@ -107,29 +107,38 @@ const Course = () => {
           <div className="flex-1 mx-6">
             <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 rounded-xl p-3 text-center shadow-lg">
               <h3 className="text-xl md:text-2xl font-bold text-white italic">
-                The Complete {course.course_name} Course – 2025 Edition
+                The Complete {course.title} Course – 2025 Edition
               </h3>
             </div>
           </div>
         </div>
 
         <div className="mt-6 flex flex-col lg:flex-row gap-6">
-          <ReactPlayer
-            ref={playerRef}
-            onProgress={(progress) => {
-              if (changePlayed + 10 <= progress.playedSeconds) {
-                setChangePlayed(progress.playedSeconds);
-              }
-            }}
-            url={course.y_link}
-            controls
-            type="video/mp4"
-            width="100%"
-            height="440px"
-            onDuration={handleDuration}
-            played={played}
-            className="rounded-xl bg-neutral shadow-2xl p-2"
-          />
+          {course.video_url ? (
+            <ReactPlayer
+              ref={playerRef}
+              onProgress={(progress) => {
+                if (changePlayed + 10 <= progress.playedSeconds) {
+                  setChangePlayed(progress.playedSeconds);
+                }
+              }}
+              url={course.video_url}
+              controls
+              width="100%"
+              height="440px"
+              onDuration={handleDuration}
+              onError={(e) => console.error('Video error:', e)}
+              className="rounded-xl bg-neutral shadow-2xl p-2"
+            />
+          ) : (
+            <div className="w-full lg:w-1/2 bg-gray-900 rounded-xl shadow-2xl p-6 flex items-center justify-center">
+              <div className="text-center text-white">
+                <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-semibold mb-2">No Video Available</p>
+                <p className="text-sm text-gray-400">Please contact the instructor to add course content.</p>
+              </div>
+            </div>
+          )}
 
           <div className="w-full lg:w-1/2 bg-white rounded-xl shadow-2xl p-6">
             <div className="flex items-center gap-2 mb-1">
@@ -155,7 +164,7 @@ const Course = () => {
             </div>
             <ul className="list-disc list-inside text-gray-600 text-xs mb-4 text-left">
               <li>Beginners interested in learning programming.</li>
-              <li>Individuals looking to add {course.course_name} to their skillset.</li>
+              <li>Individuals looking to add {course.title} to their skillset.</li>
               <li>Students preparing for computer science courses.</li>
             </ul>
 
@@ -169,7 +178,7 @@ const Course = () => {
 
             {progressPercent >= 98 ? (
               <button
-                onClick={() => navigate(`/assessment/${course.course_id}`)}
+                onClick={() => navigate(`/assessment/${course.id}`)}
                 className="w-full py-2 bg-accent text-white rounded-lg font-semibold hover:bg-accent/90 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
                 <Award className="w-4 h-4" />

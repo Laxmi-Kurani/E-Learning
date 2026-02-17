@@ -50,13 +50,19 @@ function AddQuestion({ courseId, onBack }) {
   const fetchQuestions = async () => {
     setLoadingQuestions(true);
     try {
+      console.log('Fetching questions for courseId:', courseId);
       const result = await questionService.getQuestionsByCourse(courseId);
+      console.log('Questions fetch result:', result);
+      
       if (result.success) {
         setQuestions(result.data);
+        console.log('Questions loaded:', result.data.length);
       } else {
+        console.error('Failed to fetch questions:', result.error);
         message.error(result.error || 'Failed to fetch questions');
       }
     } catch (error) {
+      console.error('Exception fetching questions:', error);
       message.error('Failed to fetch questions');
     } finally {
       setLoadingQuestions(false);
@@ -184,16 +190,39 @@ function AddQuestion({ courseId, onBack }) {
       title: 'Question',
       dataIndex: 'question',
       key: 'question',
-      width: '85%',
+      width: '60%',
       render: (text) => (
         <div>
-          <Text ellipsis={{ tooltip: text }}>{text}</Text>
+          <Text strong>{text}</Text>
         </div>
       ),
     },
     {
+      title: 'Options',
+      key: 'options',
+      width: '25%',
+      render: (_, record) => {
+        return (
+          <div className="flex gap-2">
+            {['option1', 'option2', 'option3', 'option4'].map((opt, idx) => (
+              <Button
+                key={opt}
+                type="default"
+                size="small"
+                className="px-3 py-1 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-blue-100 border-gray-300"
+                title={record[opt]}
+              >
+                {String.fromCharCode(65 + idx)}
+              </Button>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
+      width: '15%',
       render: (_, record) => (
         <div className="flex gap-2">
           <Button
@@ -399,6 +428,17 @@ function AddQuestion({ courseId, onBack }) {
               pageSize: 10,
               showSizeChanger: false,
               className: "mt-4"
+            }}
+            locale={{
+              emptyText: (
+                <div className="py-8 text-center">
+                  <div className="text-gray-400 mb-2">
+                    <FontAwesomeIcon icon={faQuestionCircle} className="text-4xl" />
+                  </div>
+                  <p className="text-gray-600 font-medium mb-2">No questions yet</p>
+                  <p className="text-gray-500 text-sm">Click "Add New Question" to create your first question</p>
+                </div>
+              )
             }}
             className="rounded-lg border border-gray-200"
             scroll={{ x: 800 }}

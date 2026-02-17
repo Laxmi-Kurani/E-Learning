@@ -12,11 +12,13 @@ function Assessment() {
   const [test, setTest] = useState([]);
   const [userId] = useState(localStorage.getItem("id"));
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [submittedAnswers, setSubmittedAnswers] = useState({});
   const [correctCount, setCorrectCount] = useState(0);
   const [openModal, setOpenModal] = useState(false);
   const [totalQsns, setTotalQsns] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -32,6 +34,8 @@ function Assessment() {
   }, [courseId]);
 
   const handleAnswerChange = (questionId, selectedOption) => {
+    if (isSubmitted) return; // Prevent changes after submission
+    
     const question = test.find(q => q.id === questionId);
     const prevAnswer = selectedAnswers[questionId];
     const updatedSelectedAnswers = { ...selectedAnswers };
@@ -52,6 +56,8 @@ function Assessment() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setIsSubmitted(true);
+    setSubmittedAnswers({...selectedAnswers});
     const marks = totalQsns > 0 ? (correctCount / totalQsns) * 100 : 0;
     const result = await assessmentService.submitAssessment(userId, courseId, marks);
     setSubmitting(false);
@@ -121,66 +127,110 @@ function Assessment() {
               </div>
 
               <div className="p-6 space-y-3">
-                {[question.option1, question.option2, question.option3, question.option4].map((option, optionIndex) => (
-                  <label
-                    key={`${question.id}-${optionIndex}`}
-                    className={`flex items-center p-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                      selectedAnswers[question.id] === option
-                        ? 'bg-indigo-100 border-2 border-indigo-500 text-indigo-800'
-                        : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`question-${question.id}`}
-                      checked={selectedAnswers[question.id] === option}
-                      onChange={() => handleAnswerChange(question.id, option)}
-                      className="sr-only"
-                    />
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mr-3 ${
-                        selectedAnswers[question.id] === option
-                          ? 'border-indigo-500 bg-indigo-500'
-                          : 'border-gray-300'
-                      }`}
+                {[question.option1, question.option2, question.option3, question.option4].map((option, optionIndex) => {
+                  const isSelected = selectedAnswers[question.id] === option;
+                  const isCorrect = question.answer === option;
+                  const isWrong = isSubmitted && isSelected && !isCorrect;
+                  const showCorrect = isSubmitted && isCorrect;
+                  
+                  return (
+                    <label
+                      key={`${question.id}-${optionIndex}`}
+                      className={`flex items-center p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                        isWrong
+                          ? 'bg-red-100 border-2 border-red-500 text-red-800'
+                          : showCorrect
+                          ? 'bg-green-100 border-2 border-green-500 text-green-800'
+                          : isSelected
+                          ? 'bg-indigo-100 border-2 border-indigo-500 text-indigo-800'
+                          : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                      } ${isSubmitted ? 'cursor-not-allowed' : ''}`}
                     >
-                      {selectedAnswers[question.id] === option && (
-                        <FontAwesomeIcon icon={faCheck} className="text-white text-xs" />
+                      <input
+                        type="radio"
+                        name={`question-${question.id}`}
+                        checked={isSelected}
+                        onChange={() => handleAnswerChange(question.id, option)}
+                        className="sr-only"
+                        disabled={isSubmitted}
+                      />
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${
+                          isWrong
+                            ? 'border-red-500 bg-red-500'
+                            : showCorrect
+                            ? 'border-green-500 bg-green-500'
+                            : isSelected
+                            ? 'border-indigo-500 bg-indigo-500'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {isWrong && (
+                          <FontAwesomeIcon icon={faTimes} className="text-white text-xs" />
+                        )}
+                        {showCorrect && (
+                          <FontAwesomeIcon icon={faCheck} className="text-white text-xs" />
+                        )}
+                        {!isSubmitted && isSelected && (
+                          <FontAwesomeIcon icon={faCheck} className="text-white text-xs" />
+                        )}
+                      </div>
+                      <span className="text-gray-700 font-medium flex-1">{option}</span>
+                      {isSubmitted && isCorrect && (
+                        <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-semibold">
+                          ✓ Correct Answer
+                        </span>
                       )}
-                    </div>
-                    <span className="text-gray-700 font-medium">{option}</span>
-                  </label>
-                ))}
+                      {isWrong && (
+                        <span className="ml-2 text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full font-semibold">
+                          ✗ Wrong
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
 
         <div className="flex justify-center gap-4 mt-8">
-          <button
-            onClick={handleReset}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-md"
-          >
-            Reset All
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || Object.keys(selectedAnswers).length !== totalQsns}
-            className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg ${
-              submitting || Object.keys(selectedAnswers).length !== totalQsns
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-            }`}
-          >
-            {submitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
-                Submitting...
-              </>
-            ) : (
-              'Submit Assessment'
-            )}
-          </button>
+          {!isSubmitted && (
+            <>
+              <button
+                onClick={handleReset}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-md"
+              >
+                Reset All
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || Object.keys(selectedAnswers).length !== totalQsns}
+                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg ${
+                  submitting || Object.keys(selectedAnswers).length !== totalQsns
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                }`}
+              >
+                {submitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Assessment'
+                )}
+              </button>
+            </>
+          )}
+          {isSubmitted && (
+            <button
+              onClick={() => navigate(`/course/${courseId}`)}
+              className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold transition-all duration-200 hover:shadow-lg"
+            >
+              Back to Course
+            </button>
+          )}
         </div>
       </div>
 
