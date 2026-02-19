@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/database');
+const { verifyToken } = require('../middleware/auth');
 
 // Register
 router.post('/register', async (req, res) => {
@@ -78,3 +79,15 @@ router.post('/login', async (req, res) => {
 });
 
 module.exports = router;
+
+// Logout
+router.post('/logout', verifyToken, async (req, res) => {
+  try {
+    // For JWT-based auth stored in client localStorage, logout is handled client-side by clearing tokens.
+    // This endpoint exists to give the client an authenticated route to call during logout
+    // and to allow server-side token revocation in the future.
+    return res.json({ message: 'Logout successful' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Logout failed', error: error.message });
+  }
+});
