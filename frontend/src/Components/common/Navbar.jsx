@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import logo from "../../assets/images/logo.jpg";
+import { Link, useNavigate } from "react-router-dom";
+import { Navbar as BSNav, Nav, Container, Button, NavDropdown } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faChalkboardUser } from "@fortawesome/free-solid-svg-icons";
 import { authService } from "../../api/auth.service";
@@ -9,166 +8,51 @@ import { authService } from "../../api/auth.service";
 function Navbar(props) {
   const value = props.page;
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(authService.isUserAuthenticated());
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
 
   const handleLogOut = async () => {
     await authService.logout();
-    navigate("/login");
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false);
+    setIsAuthenticated(false);
   };
 
   return (
-    <div>
-      <nav className="bg-white/95 backdrop-blur-md w-full flex flex-row justify-between items-center px-[4vw] py-2 shadow-lg sticky top-0 z-[999]">
-        <div className="flex items-center justify-center cursor-pointer" onClick={() => navigate("/")}>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-xl">N2</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">
-                E-Learning
-              </h1>
-              <p className="text-xs text-gray-500 font-medium">Learn. Grow. Succeed.</p>
+    <BSNav bg="light" expand="lg" className="shadow-sm sticky-top">
+      <Container>
+        <BSNav.Brand as={Link} to="/" className="d-flex align-items-center">
+          <div className="d-flex align-items-center">
+            <div style={{width:40,height:40, borderRadius:8, background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:800}}>N2</div>
+            <div className="ms-2">
+              <div className="h5 mb-0">E-Learning</div>
+              <small className="text-muted">Learn. Grow. Succeed.</small>
             </div>
           </div>
-        </div>
-        <div className="flex">
-          <div id="menu-btn" className="hidden">
-            <div className="menu-dash" onClick={toggleMobileMenu}>
-              &#9776;
-            </div>
-          </div>
-          <i
-            id="menu-close"
-            className="fas fa-times hidden"
-            onClick={closeMobileMenu}
-          ></i>
-          <ul className={`flex justify-end items-center ${isMobileMenuOpen ? "active" : ""}`}>
-            {isMobileMenuOpen && (
-              <li className="close-button">
-                <button onClick={closeMobileMenu}>X</button>
-              </li>
+        </BSNav.Brand>
+        <BSNav.Toggle aria-controls="basic-navbar-nav" />
+        <BSNav.Collapse id="basic-navbar-nav">
+          <Nav className="ms-auto align-items-center">
+            <Nav.Link as={Link} to="/" active={value === 'home'}>Home</Nav.Link>
+            <Nav.Link as={Link} to="/courses" active={value === 'courses'}>Courses</Nav.Link>
+
+            {isAuthenticated && (
+              <>
+                <Nav.Link as={Link} to="/profile" active={value === 'profile'}>
+                  Profile <FontAwesomeIcon icon={faUser} className="ms-2" />
+                </Nav.Link>
+                <Nav.Link as={Link} to="/learnings" active={value === 'learnings'}>
+                  Learnings <FontAwesomeIcon icon={faChalkboardUser} className="ms-2" />
+                </Nav.Link>
+              </>
             )}
-            {value === "home" ? (
-              <li className="list-none ml-5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-md">
-                <Link 
-                  to={"/"} 
-                  className="no-underline text-white text-[17px] font-bold transition-all duration-300 ease-in-out px-4 py-2 block hover:scale-105"
-                >
-                  Home
-                </Link>
-              </li>
-            ) : (
-              <li className="list-none ml-5">
-                <Link 
-                  to={"/"}
-                  className="no-underline text-gray-700 text-[17px] font-bold transition-all duration-300 ease-in-out hover:text-purple-600 px-2"
-                >
-                  Home
-                </Link>
-              </li>
-            )}
-            {value === "courses" ? (
-              <li className="list-none ml-5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-md">
-                <Link
-                  to={"/courses"}
-                  className="no-underline text-white text-[17px] font-bold transition-all duration-300 ease-in-out px-4 py-2 block hover:scale-105"
-                >
-                  Courses
-                </Link>
-              </li>
-            ) : (
-              <li className="list-none ml-5">
-                <Link 
-                  to={"/courses"}
-                  className="no-underline text-gray-700 text-[17px] font-bold transition-all duration-300 ease-in-out hover:text-purple-600 px-2"
-                >
-                  Courses
-                </Link>
-              </li>
-            )}
-            {isAuthenticated  ? (
-              value === "profile" ? (
-                <li className="list-none ml-5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-md">
-                  <Link
-                    to={"/profile"}
-                    className="no-underline text-white text-[17px] font-bold transition-all duration-300 ease-in-out px-4 py-2 block hover:scale-105"
-                  >
-                    Profile
-                    <FontAwesomeIcon icon={faUser} className="ml-2" />
-                  </Link>
-                </li>
-              ) : (
-                <li className="list-none ml-5">
-                  <Link 
-                    to={"/profile"}
-                    className="no-underline text-gray-700 text-[17px] font-bold transition-all duration-300 ease-in-out hover:text-purple-600 px-2"
-                  >
-                    Profile
-                    <FontAwesomeIcon icon={faUser} className="ml-2" />
-                  </Link>
-                </li>
-              )
-            ) : (
-              <></>
-            )}
+
             {isAuthenticated ? (
-              value === "learnings" ? (
-                <li className="list-none ml-5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-md">
-                  <Link
-                    to={"/learnings"}
-                    className="no-underline text-white text-[17px] font-bold transition-all duration-300 ease-in-out px-4 py-2 block hover:scale-105"
-                  >
-                    Learnings
-                    <FontAwesomeIcon icon={faChalkboardUser} className="ml-2" />
-                  </Link>
-                </li>
-              ) : (
-                <li className="list-none ml-5">
-                  <Link 
-                    to={"/learnings"}
-                    className="no-underline text-gray-700 text-[17px] font-bold transition-all duration-300 ease-in-out hover:text-purple-600 px-2"
-                  >
-                    Learnings
-                    <FontAwesomeIcon icon={faChalkboardUser} className="ml-2" />
-                  </Link>
-                </li>
-              )
+              <Button variant="danger" className="ms-3" onClick={handleLogOut}>Sign Out</Button>
             ) : (
-              <></>
+              <Button variant="primary" className="ms-3" onClick={() => navigate('/login')}>Login / SignUp</Button>
             )}
-            {isAuthenticated ? (
-              <li className="list-none ml-5">
-                <button 
-                  onClick={handleLogOut} 
-                  className="px-6 py-2 bg-gradient-to-r from-red-500 to-pink-600 border-none rounded-xl text-white text-[15px] font-bold cursor-pointer transition-all duration-300 ease-in-out hover:shadow-lg hover:scale-105"
-                >
-                  Sign Out
-                </button>
-              </li>
-            ) : (
-              <li className="list-none ml-5">
-                <button 
-                  onClick={() => navigate("/login")}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 border-none rounded-xl text-white text-[15px] font-bold cursor-pointer transition-all duration-300 ease-in-out hover:shadow-lg hover:scale-105"
-                >
-                  Login/SignUp
-                </button>
-              </li>
-            )}
-          </ul>
-        </div>
-      </nav>
-    </div>
+          </Nav>
+        </BSNav.Collapse>
+      </Container>
+    </BSNav>
   );
 }
 

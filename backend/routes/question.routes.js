@@ -74,7 +74,7 @@ router.get('/course/:courseId', verifyToken, async (req, res) => {
     const { courseId } = req.params;
     const { limit, offset } = getPaginationParams(req.query);
     const search = req.query.search || '';
-    
+
     // Validate course exists
     const [courses] = await db.query('SELECT id FROM course WHERE id = ?', [courseId]);
     if (courses.length === 0) {
@@ -82,36 +82,36 @@ router.get('/course/:courseId', verifyToken, async (req, res) => {
         error: 'Course not found'
       });
     }
-    
+
     // Get total count
     let countQuery = 'SELECT COUNT(*) as count FROM question WHERE course_id = ?';
     let countParams = [courseId];
-    
+
     if (search) {
       countQuery += ' AND question_text LIKE ?';
       countParams.push(`%${search}%`);
     }
-    
+
     const [countResult] = await db.query(countQuery, countParams);
     const total = countResult[0].count;
-    
+
     // Get paginated questions
     let dataQuery = `SELECT id, course_id, question_text as question, 
                    option_a as option1, option_b as option2, option_c as option3, 
                    option_d as option4, correct_answer as answer, created_at
                    FROM question WHERE course_id = ?`;
     let dataParams = [courseId];
-    
+
     if (search) {
       dataQuery += ' AND question_text LIKE ?';
       dataParams.push(`%${search}%`);
     }
-    
+
     dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     dataParams.push(limit, offset);
-    
+
     const [questions] = await db.query(dataQuery, dataParams);
-    
+
     res.json({
       data: questions,
       pagination: {
@@ -123,6 +123,27 @@ router.get('/course/:courseId', verifyToken, async (req, res) => {
         hasPrevPage: offset > 0
       }
     });
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    const dbError = handleDatabaseError(error);
+    res.status(dbError.statusCode).json({ error: dbError.message });
+  }
+});
+
+// Get questions for assessment (mapped format for frontend)
+router.get('/assessment/:courseId', verifyToken, async (req, res) => {
+  try {
+    const db = getPool();
+    const { courseId } = req.params;
+
+    const [questions] = await db.query(
+      `SELECT id, course_id, question_text as question, 
+       option_a as option1, option_b as option2, option_c as option3, option_d as option4, 
+       correct_answer as answer 
+       FROM question WHERE course_id = ?`,
+      [courseId]
+    );
+    res.json(questions);
   } catch (error) {
     console.error('Error fetching questions:', error);
     const dbError = handleDatabaseError(error);

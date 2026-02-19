@@ -2,7 +2,7 @@ import api from "./api";
 
 async function getQuestions(courseId) {
   try {
-    const { data } = await api.get(`/api/questions/course/${courseId}`);
+    const { data } = await api.get(`/api/questions/assessment/${courseId}`);
     return { success: true, data };
   } catch (err) {
     console.error("Error fetching questions:", err);

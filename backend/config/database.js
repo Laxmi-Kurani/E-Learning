@@ -5,9 +5,9 @@ require('dotenv').config();
 const initDatabase = async () => {
   return new Promise((resolve, reject) => {
     const connection = mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || ''
     });
 
     connection.connect((err) => {
@@ -17,7 +17,8 @@ const initDatabase = async () => {
       }
     });
 
-    connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME}`, (err) => {
+    const dbName = process.env.DB_NAME || 'lms';
+    connection.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`, (err) => {
       if (err) {
         console.error('Error creating database:', err);
         reject(err);
@@ -39,10 +40,10 @@ const setupPool = async () => {
     
     // Now create the pool with the database
     const pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'lms',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0

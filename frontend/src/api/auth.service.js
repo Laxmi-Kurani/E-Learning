@@ -138,6 +138,10 @@ function isUserAuthenticated(){
   return !!localStorage.getItem("token") && localStorage.getItem("role") === "USER";
 }
 
+function isAuthenticated() {
+  return !!localStorage.getItem("token");
+}
+
 function getCurrentUser() {
   return {
     token: localStorage.getItem("token"),
@@ -162,4 +166,5 @@ export const authService = {
   isUserAuthenticated,
   getCurrentUser,
   getAuthHeader,
+  isAuthenticated,
 };

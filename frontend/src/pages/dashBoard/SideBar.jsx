@@ -1,6 +1,9 @@
 import img1 from "../../assets/images/user.png";
+import { useNavigate } from "react-router-dom";
+import { authService } from "../../api/auth.service";
 
 function SideBar({ current, onSelect }) {
+  const navigate = useNavigate();
   const menuItems = [
     { key: "dashboard", label: "Dashboard", icon: "bx bxs-dashboard" },
     { key: "user", label: "Users", icon: "bx bxs-group" },
@@ -9,7 +12,7 @@ function SideBar({ current, onSelect }) {
   ];
 
   return (
-    <div className="bg-white shadow-lg flex flex-col p-4 px-10">
+    <div className="bg-white shadow-lg flex flex-col p-4 px-10 min-h-screen">
       <div
         className="flex items-center gap-3 px-3 py-5 border-b border-gray-200 cursor-pointer"
         onClick={() => onSelect("dashboard")}
@@ -34,6 +37,17 @@ function SideBar({ current, onSelect }) {
           </li>
         ))}
       </ul>
+      <div className="mt-auto px-4 py-4">
+        <button
+          onClick={async () => {
+            await authService.logout();
+            navigate('/login');
+          }}
+          className="w-full flex items-center justify-center gap-3 p-3 rounded-lg bg-red-500 text-white hover:bg-red-600"
+        >
+          <span className="font-medium">Sign Out</span>
+        </button>
+      </div>
     </div>
   );
 }
