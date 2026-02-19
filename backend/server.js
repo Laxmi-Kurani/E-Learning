@@ -59,6 +59,7 @@ const initTables = async () => {
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/auth/password', require('./routes/passwordReset.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/learning', require('./routes/learning.routes'));
@@ -67,6 +68,9 @@ app.use('/api/questions', require('./routes/question.routes'));
 app.use('/api/assessments', require('./routes/assessment.routes'));
 app.use('/api/discussions', require('./routes/discussion.routes'));
 app.use('/api/feedbacks', require('./routes/feedback.routes'));
+app.use('/api/certificates', require('./routes/certificate.routes'));
+app.use('/api/analytics', require('./routes/analytics.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

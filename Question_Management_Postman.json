@@ -1,0 +1,348 @@
+{
+  "info": {
+    "name": "E-Learning LMS - Question Management",
+    "description": "Complete Question Management API testing collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@elearning.com\",\n  \"password\": \"Admin@123456\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Get All",
+      "item": [
+        {
+          "name": "Get All Questions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions?page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Questions with Search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions?page=1&limit=10&search=capital",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "capital"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Questions with Course Filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions?courseId=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions"],
+              "query": [
+                {
+                  "key": "courseId",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - By Course",
+      "item": [
+        {
+          "name": "Get Questions for Course",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions/course/1?page=1&limit=5",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "course", "1"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Questions for Course (with Search)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions/course/1?search=geography",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "course", "1"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "geography"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Single",
+      "item": [
+        {
+          "name": "Get Single Question",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Create",
+      "item": [
+        {
+          "name": "Create Question",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": 1,\n  \"questionText\": \"What is the capital of France?\",\n  \"optionA\": \"London\",\n  \"optionB\": \"Paris\",\n  \"optionC\": \"Berlin\",\n  \"optionD\": \"Madrid\",\n  \"correctAnswer\": \"B\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/questions",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Update",
+      "item": [
+        {
+          "name": "Update Question",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionText\": \"What is the capital of Italy?\",\n  \"optionA\": \"Milan\",\n  \"optionB\": \"Rome\",\n  \"optionC\": \"Venice\",\n  \"optionD\": \"Florence\",\n  \"correctAnswer\": \"B\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/questions/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Delete",
+      "item": [
+        {
+          "name": "Delete Question",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/questions/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Questions - Bulk Import",
+      "item": [
+        {
+          "name": "Bulk Import Questions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": 1,\n  \"questions\": [\n    {\n      \"questionText\": \"What is 2+2?\",\n      \"optionA\": \"3\",\n      \"optionB\": \"4\",\n      \"optionC\": \"5\",\n      \"optionD\": \"6\",\n      \"correctAnswer\": \"B\"\n    },\n    {\n      \"questionText\": \"What is 3+3?\",\n      \"optionA\": \"5\",\n      \"optionB\": \"6\",\n      \"optionC\": \"7\",\n      \"optionD\": \"8\",\n      \"correctAnswer\": \"B\"\n    },\n    {\n      \"questionText\": \"What is 4+4?\",\n      \"optionA\": \"7\",\n      \"optionB\": \"8\",\n      \"optionC\": \"9\",\n      \"optionD\": \"10\",\n      \"correctAnswer\": \"B\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/questions/bulk/import",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "questions", "bulk", "import"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

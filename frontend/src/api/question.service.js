@@ -2,9 +2,12 @@ import api from "./api";
 
 async function getQuestionsByCourse(courseId) {
   try {
-    const { data } = await api.get(`/api/questions/course/${courseId}`);
+    const response = await api.get(`/api/questions/course/${courseId}`);
+    // Backend now returns { data: [...], pagination: {...} }
+    const questions = response.data.data || [];
+    
     // Map backend field names to frontend field names
-    const mappedData = data.map(q => ({
+    const mappedData = questions.map(q => ({
       id: q.id,
       question: q.question_text,
       option1: q.option_a,

@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS user (
   linkedin_url VARCHAR(500),
   github_url VARCHAR(500),
   profile_image LONGTEXT,
+  reset_token VARCHAR(255),
+  reset_token_expiry TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -109,4 +111,33 @@ CREATE TABLE IF NOT EXISTS feedback (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
   FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE
+);
+
+-- Certificate table
+CREATE TABLE IF NOT EXISTS certificate (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  course_id INT NOT NULL,
+  certificate_url TEXT,
+  issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('NOT_ISSUED', 'ISSUED', 'REVOKED') DEFAULT 'NOT_ISSUED',
+  FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+  FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_certificate (user_id, course_id)
+);
+
+-- Notification table
+CREATE TABLE IF NOT EXISTS notification (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  message TEXT,
+  type VARCHAR(50),
+  is_read BOOLEAN DEFAULT FALSE,
+  related_entity_type VARCHAR(50),
+  related_entity_id INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+  INDEX idx_user_read (user_id, is_read),
+  INDEX idx_created_at (created_at)
 );
