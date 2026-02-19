@@ -4,6 +4,8 @@ import Dashboard from "./Dashboard";
 import SideBar from "./SideBar";
 import Users from "./DUsers";
 import Enrollments from "./DEnrollments";
+import DCertificates from "./DCertificates";
+import DAssessments from "./DAssessments";
 import { authService } from "../../api/auth.service";
 
 
@@ -22,8 +24,12 @@ function AdminDashboard() {
         return <Users />;
       case "courses":
         return <Courses />;
+      case "assessments":
+        return <DAssessments />;
       case "enrollments":
         return <Enrollments />;
+      case "certificates":
+        return <DCertificates />;
       default:
         return <Dashboard isAuthenticated = {isAuthenticated}/>;
     }
