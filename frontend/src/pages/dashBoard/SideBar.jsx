@@ -8,7 +8,9 @@ function SideBar({ current, onSelect }) {
     { key: "dashboard", label: "Dashboard", icon: "bx bxs-dashboard" },
     { key: "user", label: "Users", icon: "bx bxs-group" },
     { key: "courses", label: "Courses", icon: "bx bxs-book" },
+    { key: "assessments", label: "Assessments", icon: "bx bxs-graduation" },
     { key: "enrollments", label: "Enrollments", icon: "bx bxs-user-check" },
+    { key: "certificates", label: "Certificates", icon: "bx bxs-file" },
   ];
 
   return (

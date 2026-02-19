@@ -1,7 +1,70 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../config/database');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, isAdmin } = require('../middleware/auth');
+const { getPaginationParams } = require('../utils/helpers');
+
+// Get all assessments (Admin only) - with pagination and filters
+router.get('/', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const db = getPool();
+    const { limit, offset } = getPaginationParams(req.query);
+    const courseId = req.query.courseId;
+    const status = req.query.status;
+
+    let query = 'SELECT COUNT(*) as count FROM assessment WHERE 1=1';
+    let countParams = [];
+
+    let dataQuery = `SELECT a.*, u.username, u.email, c.title as course_title
+                    FROM assessment a
+                    JOIN user u ON a.user_id = u.id
+                    JOIN course c ON a.course_id = c.id
+                    WHERE 1=1`;
+    let dataParams = [];
+
+    // Apply course filter
+    if (courseId && !isNaN(courseId)) {
+      query += ' AND course_id = ?';
+      dataQuery += ' AND a.course_id = ?';
+      countParams.push(courseId);
+      dataParams.push(courseId);
+    }
+
+    // Apply status filter
+    if (status === 'PASSED') {
+      query += ' AND passed = true';
+      dataQuery += ' AND a.passed = true';
+    } else if (status === 'FAILED') {
+      query += ' AND passed = false';
+      dataQuery += ' AND a.passed = false';
+    }
+
+    // Get total count
+    const [countResult] = await db.query(query, countParams);
+    const total = countResult[0].count;
+
+    // Get paginated data
+    dataQuery += ' ORDER BY a.completed_at DESC LIMIT ? OFFSET ?';
+    dataParams.push(limit, offset);
+
+    const [assessments] = await db.query(dataQuery, dataParams);
+
+    res.json({
+      assessments,
+      pagination: {
+        currentPage: Math.floor(offset / limit) + 1,
+        limit,
+        totalRecords: total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: offset + limit < total,
+        hasPrevPage: offset > 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching assessments:', error);
+    res.status(500).json({ message: 'Error fetching assessments', error: error.message });
+  }
+});
 
 // Submit assessment
 router.post('/submit', verifyToken, async (req, res) => {
