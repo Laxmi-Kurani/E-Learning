@@ -4,11 +4,33 @@ const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
-// Get all users (Admin only)
+// Get all users (Admin only) with optional filtering/search
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
     const db = getPool();
-    const [users] = await db.query('SELECT id, username, email, role, created_at FROM user');
+    const { role, search, isActive } = req.query;
+    let sql = 'SELECT id, username, email, role, isActive, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user';
+    const params = [];
+    const conditions = [];
+
+    if (role) {
+      conditions.push('role = ?');
+      params.push(role);
+    }
+    if (isActive !== undefined) {
+      conditions.push('isActive = ?');
+      params.push(isActive);
+    }
+    if (search) {
+      conditions.push('(username LIKE ? OR email LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (conditions.length) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+    sql += ' ORDER BY created_at DESC';
+
+    const [users] = await db.query(sql, params);
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users', error: error.message });
@@ -19,7 +41,7 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
 router.get('/profile', verifyToken, async (req, res) => {
   try {
     const db = getPool();
-    const [users] = await db.query('SELECT id, username, email, role, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', [req.userId]);
+    const [users] = await db.query('SELECT id, username, email, role, isActive, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', [req.userId]);
     if (users.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -29,6 +51,27 @@ router.get('/profile', verifyToken, async (req, res) => {
   }
 });
 
+// Create new user (Admin only)
+router.post('/', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const db = getPool();
+    const { username, email, password, role = 'USER', isActive = true } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'username, email and password are required' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await db.query(
+      'INSERT INTO user (username, email, password, role, isActive) VALUES (?, ?, ?, ?, ?)',
+      [username, email, hashedPassword, role, isActive]
+    );
+    res.status(201).json({ message: 'User created successfully', userId: result.insertId });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ message: 'Error creating user', error: error.message });
+  }
+});
 // Update user profile (must come before /:id route)
 router.put('/profile', verifyToken, async (req, res) => {
   try {
@@ -48,6 +91,7 @@ router.put('/profile', verifyToken, async (req, res) => {
     if (location !== undefined) { updates.push('location=?'); values.push(location); }
     if (linkedin_url !== undefined) { updates.push('linkedin_url=?'); values.push(linkedin_url); }
     if (github_url !== undefined) { updates.push('github_url=?'); values.push(github_url); }
+    // profile route should not allow altering isActive or role
     
     if (updates.length === 0) {
       return res.status(400).json({ message: 'No fields to update' });
@@ -136,7 +180,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   try {
     const db = getPool();
     const [users] = await db.query(
-      'SELECT id, username, email, role, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', 
+      'SELECT id, username, email, role, isActive, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at FROM user WHERE id = ?', 
       [req.params.id]
     );
     if (users.length === 0) {
@@ -211,7 +255,19 @@ router.post('/:id/upload-image', verifyToken, async (req, res) => {
 router.put('/:id', verifyToken, async (req, res) => {
   try {
     const db = getPool();
-    const { username, email, mobileNumber, gender, dob, profession, location, linkedin_url, github_url } = req.body;
+    const {
+      username,
+      email,
+      mobileNumber,
+      gender,
+      dob,
+      profession,
+      location,
+      linkedin_url,
+      github_url,
+      role,
+      isActive
+    } = req.body;
     
     // Build dynamic update query based on provided fields
     const updates = [];
@@ -226,6 +282,16 @@ router.put('/:id', verifyToken, async (req, res) => {
     if (location !== undefined) { updates.push('location=?'); values.push(location); }
     if (linkedin_url !== undefined) { updates.push('linkedin_url=?'); values.push(linkedin_url); }
     if (github_url !== undefined) { updates.push('github_url=?'); values.push(github_url); }
+    // allow admin to change role
+    if (role !== undefined && req.userRole === 'ADMIN') {
+      updates.push('role=?');
+      values.push(role);
+    }
+    // allow admin to toggle active status
+    if (isActive !== undefined && req.userRole === 'ADMIN') {
+      updates.push('isActive=?');
+      values.push(isActive);
+    }
     
     if (updates.length === 0) {
       return res.status(400).json({ message: 'No fields to update' });

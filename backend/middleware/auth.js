@@ -24,4 +24,11 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, isAdmin };
+const isInstructor = (req, res, next) => {
+  if (req.userRole !== 'INSTRUCTOR') {
+    return res.status(403).json({ message: 'Instructor access required' });
+  }
+  next();
+};
+
+module.exports = { verifyToken, isAdmin, isInstructor };

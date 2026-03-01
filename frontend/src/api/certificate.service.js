@@ -61,12 +61,58 @@ async function revokeCertificate(certificateId) {
   }
 }
 
+// admin support functions
+async function searchCertificates(params) {
+  try {
+    const { data } = await api.get('/api/certificates', { params });
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error searching certificates:', error);
+    throw error;
+  }
+}
+
+async function createCertificate(payload) {
+  try {
+    const { data } = await api.post('/api/certificates', payload);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error creating certificate:', error);
+    throw error;
+  }
+}
+
+async function updateCertificate(id, payload) {
+  try {
+    const { data } = await api.put(`/api/certificates/${id}`, payload);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error updating certificate:', error);
+    throw error;
+  }
+}
+
+async function deleteCertificate(id) {
+  try {
+    const { data } = await api.delete(`/api/certificates/${id}`);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error deleting certificate:', error);
+    throw error;
+  }
+}
+
 const certificateService = {
   getAllCertificates,
   getUserCertificates,
   getCertificateById,
   issueCertificate,
-  revokeCertificate
+  revokeCertificate,
+  // admin
+  searchCertificates,
+  createCertificate,
+  updateCertificate,
+  deleteCertificate
 };
 
 export default certificateService;

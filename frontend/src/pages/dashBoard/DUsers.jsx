@@ -13,14 +13,17 @@ import {
   Descriptions,
   Row,
   Col,
-  Card
+  Card,
+  Dropdown,
+  Divider
 } from "antd";
-import { EyeOutlined, EditOutlined, UserOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
+import UserModal from "./UserModal";
+import { EyeOutlined, EditOutlined, UserOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MoreOutlined } from "@ant-design/icons";
 import { adminService } from "../../api/admin.service";
 
 const { Option } = Select;
 
-function Users() {
+function Users({ initialRole = '' }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -28,14 +31,23 @@ function Users() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [editForm] = Form.useForm();
 
+  const [userModal, setUserModal] = useState({ isOpen: false, mode: "add", userId: null, defaultRole: '' });
+  const [searchText, setSearchText] = useState('');
+  const [roleFilter, setRoleFilter] = useState(initialRole);
+  const [statusFilter, setStatusFilter] = useState('');
+
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [roleFilter, searchText, statusFilter]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await adminService.getAllUsers();
+      const filters = {};
+      if (roleFilter) filters.role = roleFilter;
+      if (statusFilter !== '') filters.isActive = statusFilter;
+      if (searchText) filters.search = searchText;
+      const res = await adminService.getAllUsers(filters);
       if (res.success) {
         setUsers(res.data);
       } else {
@@ -51,6 +63,18 @@ function Users() {
   const handleView = (user) => {
     setSelectedUser(user);
     setViewModalVisible(true);
+  };
+
+  const openAddUserModal = () => {
+    setUserModal({ isOpen: true, mode: "add", userId: null, defaultRole: initialRole });
+  };
+
+  const closeUserModal = () => {
+    setUserModal({ isOpen: false, mode: "add", userId: null });
+  };
+
+  const handleUserSuccess = () => {
+    fetchUsers();
   };
 
   const handleEdit = (user) => {
@@ -219,71 +243,137 @@ function Users() {
       title: "Actions",
       key: "actions",
       width: 200,
-      render: (_, record) => (
-        <Space size="small" wrap>
-          <Button
-            type="primary"
-            ghost
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-            size="small"
-          >
-            View
-          </Button>
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            size="small"
-          >
-            Edit
-          </Button>
-          {record.role === 'USER' ? (
+      render: (_, record) => {
+        const roleMenuItems = record.role === 'USER'
+          ? [
+              {
+                key: 'promote',
+                label: 'Promote to Admin',
+                icon: <ArrowUpOutlined />,
+                onClick: () => handlePromote(record),
+              }
+            ]
+          : [
+              {
+                key: 'demote',
+                label: 'Demote to User',
+                icon: <ArrowDownOutlined />,
+                onClick: () => handleDemote(record),
+              }
+            ];
+
+        const moreActionsItems = [
+          {
+            key: 'role',
+            label: 'Role Management',
+            type: 'group',
+            children: roleMenuItems,
+          },
+          {
+            type: 'divider',
+          },
+          {
+            key: 'delete',
+            label: 'Delete User',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: () => handleDelete(record),
+          },
+        ];
+
+        return (
+          <Space size="small">
             <Button
-              type="default"
-              icon={<ArrowUpOutlined />}
-              onClick={() => handlePromote(record)}
+              type="primary"
+              ghost
+              icon={<EyeOutlined />}
+              onClick={() => handleView(record)}
               size="small"
-              title="Promote to Admin"
+              title="View Details"
             >
-              Promote
+              View
             </Button>
-          ) : (
             <Button
-              type="default"
-              icon={<ArrowDownOutlined />}
-              onClick={() => handleDemote(record)}
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
               size="small"
-              title="Demote to User"
+              title="Edit User"
             >
-              Demote
+              Edit
             </Button>
-          )}
-          <Button
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-            size="small"
-          >
-            Delete
-          </Button>
-        </Space>
-      ),
+            <Dropdown
+              menu={{ items: moreActionsItems }}
+              trigger={['click']}
+              placement="bottomRight"
+            >
+              <Button
+                type="default"
+                icon={<MoreOutlined />}
+                size="small"
+                title="More Actions"
+              />
+            </Dropdown>
+          </Space>
+        );
+      },
     },
   ];
 
   return (
     <>
-      <div className="mb-8">
-        <h3 className="text-3xl font-bold text-slate-800 tracking-tight">
-          Users Management
-        </h3>
-        <p className="text-slate-600 mt-2">
-          Manage and view all registered users
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h3 className="text-3xl font-bold text-slate-800 tracking-tight">
+            Users Management
+          </h3>
+          <p className="text-slate-600 mt-2">
+            Manage and view all registered users
+          </p>
+        </div>
+        <Button type="primary" onClick={openAddUserModal}>
+          Add User
+        </Button>
       </div>
 
       <Card className="shadow-xl">
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <Input
+            placeholder="Search by name or email"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 200 }}
+            allowClear
+          />
+          {!initialRole && (
+            <Select
+              placeholder="Filter by role"
+              value={roleFilter || undefined}
+              onChange={(value) => setRoleFilter(value)}
+              style={{ width: 160 }}
+              allowClear
+            >
+              <Option value="USER">USER</Option>
+              <Option value="ADMIN">ADMIN</Option>
+              <Option value="INSTRUCTOR">INSTRUCTOR</Option>
+            </Select>
+          )}
+          <Select
+            placeholder="Filter by status"
+            value={statusFilter !== '' ? statusFilter : undefined}
+            onChange={(value) => setStatusFilter(value)}
+            style={{ width: 160 }}
+            allowClear
+          >
+            <Option value={true}>Active</Option>
+            <Option value={false}>Inactive</Option>
+          </Select>
+          {(searchText || roleFilter || statusFilter) && (
+            <Button onClick={() => { setSearchText(''); setRoleFilter(initialRole); setStatusFilter(''); }}>
+              Clear
+            </Button>
+          )}
+        </div>
         <Table
           columns={columns}
           dataSource={users}
@@ -298,6 +388,16 @@ function Users() {
           scroll={{ x: 1200 }}
         />
       </Card>
+
+      {/* Add/Edit User Modal */}
+      <UserModal
+        isOpen={userModal.isOpen}
+        onClose={closeUserModal}
+        onSuccess={handleUserSuccess}
+        userId={userModal.userId}
+        mode={userModal.mode}
+        defaultRole={userModal.defaultRole}
+      />
 
       {/* View User Modal */}
       <Modal
@@ -460,6 +560,7 @@ function Users() {
                 <Select>
                   <Option value="USER">USER</Option>
                   <Option value="ADMIN">ADMIN</Option>
+                  <Option value="INSTRUCTOR">INSTRUCTOR</Option>
                 </Select>
               </Form.Item>
             </Col>

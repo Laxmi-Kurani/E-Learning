@@ -57,8 +57,13 @@ const Certificate = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Allow admin links to include a target user via query param ?userId=
+        const params = new URLSearchParams(window.location.search);
+        const targetUserId = params.get('userId') || userId;
+
+        // Fetch user (target) and course in parallel
         const [userRes, courseRes] = await Promise.all([
-          profileService.getUserDetails(userId),
+          profileService.getUserById(targetUserId),
           courseService.getCourseById(courseId)
         ]);
 
@@ -69,7 +74,7 @@ const Certificate = () => {
         }
 
         if (courseRes.success) {
-          setCourse(courseRes.data);          
+          setCourse(courseRes.data);
         } else {
           throw new Error("Failed to fetch course details");
         }

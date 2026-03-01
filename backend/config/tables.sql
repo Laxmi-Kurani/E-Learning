@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS user (
   username VARCHAR(100) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('ADMIN', 'USER') DEFAULT 'USER',
+  role ENUM('ADMIN','INSTRUCTOR','USER') DEFAULT 'USER',
+  isActive BOOLEAN DEFAULT TRUE,
   mobileNumber VARCHAR(20),
   gender VARCHAR(20),
   dob DATE,
@@ -126,6 +127,16 @@ CREATE TABLE IF NOT EXISTS certificate (
   UNIQUE KEY unique_certificate (user_id, course_id)
 );
 
+-- Category table for course classification
+CREATE TABLE IF NOT EXISTS category (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Ensure role enum includes INSTRUCTOR (will modify existing column if necessary)
+ALTER TABLE user MODIFY COLUMN role ENUM('ADMIN','INSTRUCTOR','USER') DEFAULT 'USER';
 -- Notification table
 CREATE TABLE IF NOT EXISTS notification (
   id INT AUTO_INCREMENT PRIMARY KEY,

@@ -11,6 +11,16 @@ async function getUserDetails(userId) {
   }
 }
 
+async function getUserById(userId) {
+  try {
+    const { data } = await api.get(`/api/users/${userId}`);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error fetching user by id:", err);
+    return { success: false, error: "Unable to fetch user" };
+  }
+}
+
 async function getProfileImage(userId) {
   try {
     const res = await api.get(`/api/users/${userId}/profile-image`, {
@@ -58,6 +68,7 @@ async function uploadProfileImage(userId, file) {
 
 export const profileService = {
   getUserDetails,
+  getUserById,
   getProfileImage,
   uploadProfileImage,
   updateUser,

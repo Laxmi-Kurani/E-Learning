@@ -7,7 +7,9 @@ function SideBar({ current, onSelect }) {
   const menuItems = [
     { key: "dashboard", label: "Dashboard", icon: "bx bxs-dashboard" },
     { key: "user", label: "Users", icon: "bx bxs-group" },
+    { key: "instructors", label: "Instructors", icon: "bx bxs-user-pin" },
     { key: "courses", label: "Courses", icon: "bx bxs-book" },
+    { key: "categories", label: "Categories", icon: "bx bxs-tag" },
     { key: "assessments", label: "Assessments", icon: "bx bxs-graduation" },
     { key: "enrollments", label: "Enrollments", icon: "bx bxs-user-check" },
     { key: "certificates", label: "Certificates", icon: "bx bxs-file" },

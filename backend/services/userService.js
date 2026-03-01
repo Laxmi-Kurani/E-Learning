@@ -10,14 +10,14 @@ class UserService {
   static async createUser(userData) {
     try {
       const db = getPool();
-      const { username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role } = userData;
+      const { username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role, isActive } = userData;
       
       const hashedPassword = await bcrypt.hash(password, 10);
       
       const [result] = await db.query(
-        `INSERT INTO user (username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [username, email, hashedPassword, mobileNumber || null, dob || null, gender || null, location || null, profession || null, linkedin_url || null, github_url || null, role || 'USER']
+        `INSERT INTO user (username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role, isActive) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [username, email, hashedPassword, mobileNumber || null, dob || null, gender || null, location || null, profession || null, linkedin_url || null, github_url || null, role || 'USER', isActive === undefined ? true : isActive]
       );
       
       return { id: result.insertId, ...userData, password: hashedPassword };
@@ -58,7 +58,10 @@ class UserService {
     const db = getPool();
     const [total] = await db.query('SELECT COUNT(*) as count FROM user');
     const [users] = await db.query(
-      'SELECT id, username, email, role, created_at FROM user ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      `SELECT id, username, email, role, isActive, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at
+       FROM user
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
       [limit, offset]
     );
     
@@ -76,6 +79,7 @@ class UserService {
     const updateFields = [];
     const values = [];
     
+    // normal users may only modify personal info
     const allowedFields = ['username', 'email', 'mobileNumber', 'gender', 'dob', 'profession', 'location', 'linkedin_url', 'github_url', 'profile_image'];
     
     for (const field of allowedFields) {

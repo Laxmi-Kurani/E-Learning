@@ -32,10 +32,12 @@ The admin dashboard displays:
 
 #### View All Users
 - View list of all registered users
-- Filter and sort by username, email, role
+- Filter and sort by username, email, role and status
 - See user status (Active/Inactive)
 
 **API Endpoint:** `GET /api/users`
+
+  - Query parameters: `role`, `search` (username/email), `isActive` (true/false) to filter results.
 
 #### View User Details
 - View complete user profile

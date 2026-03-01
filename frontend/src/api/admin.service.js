@@ -19,9 +19,14 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-async function getAllCourses() {
+async function getAllCourses(filters = {}) {
   try {
-    const { data } = await api.get("/api/courses");
+    let url = "/api/courses";
+    const params = new URLSearchParams(filters).toString();
+    if (params) {
+      url += `?${params}`;
+    }
+    const { data } = await api.get(url);
     return { success: true, data };
   } catch (error) {
     console.error("Error fetching courses:", error);
@@ -69,13 +74,26 @@ async function deleteCourse(courseId) {
   }
 }
 
-async function getAllUsers() {
+async function getAllUsers(filters = {}) {
   try {
-    const { data } = await api.get("/api/users");
+    let url = "/api/users";
+    const params = new URLSearchParams(filters).toString();
+    if (params) url += `?${params}`;
+    const { data } = await api.get(url);
     return { success: true, data };
   } catch (error) {
     console.error("Error fetching users:", error);
     return { success: false, error: "Could not fetch users" };
+  }
+}
+
+async function createUser(userData) {
+  try {
+    const { data } = await api.post("/api/users", userData);
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error creating user:", error);
+    return { success: false, error: error.response?.data?.message || "Could not create user" };
   }
 }
 
@@ -99,6 +117,49 @@ async function getPendingEnrollments() {
   }
 }
 
+// Category management
+async function getAllCategories(search = '') {
+  try {
+    let url = "/api/categories";
+    if (search) url += `?search=${encodeURIComponent(search)}`;
+    const { data } = await api.get(url);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error fetching categories:", err);
+    return { success: false, error: "Could not fetch categories" };
+  }
+}
+
+async function createCategory(categoryData) {
+  try {
+    const { data } = await api.post("/api/categories", categoryData);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error creating category:", err);
+    return { success: false, error: err.response?.data?.message || "Could not create category" };
+  }
+}
+
+async function updateCategory(categoryId, categoryData) {
+  try {
+    const { data } = await api.put(`/api/categories/${categoryId}`, categoryData);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error updating category:", err);
+    return { success: false, error: err.response?.data?.message || "Could not update category" };
+  }
+}
+
+async function deleteCategory(categoryId) {
+  try {
+    const { data } = await api.delete(`/api/categories/${categoryId}`);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error deleting category:", err);
+    return { success: false, error: err.response?.data?.message || "Could not delete category" };
+  }
+}
+
 async function approveEnrollment(enrollmentId) {
   try {
     const { data } = await api.put(`/api/learning/approve/${enrollmentId}`);
@@ -119,15 +180,6 @@ async function rejectEnrollment(enrollmentId) {
   }
 }
 
-async function updateUser(userId, updatedData) {
-  try {
-    const { data } = await api.put(`/api/users/${userId}`, updatedData);
-    return { success: true, data };
-  } catch (err) {
-    console.error("Error updating user:", err);
-    return { success: false, error: "Unable to update user" };
-  }
-}
 
 async function deleteUser(userId) {
   try {
@@ -136,6 +188,16 @@ async function deleteUser(userId) {
   } catch (err) {
     console.error("Error deleting user:", err);
     return { success: false, error: err.response?.data?.message || "Unable to delete user" };
+  }
+}
+
+async function updateUser(userId, updatedData) {
+  try {
+    const { data } = await api.put(`/api/users/${userId}`, updatedData);
+    return { success: true, data };
+  } catch (err) {
+    console.error("Error updating user:", err);
+    return { success: false, error: err.response?.data?.message || "Unable to update user" };
   }
 }
 
@@ -228,6 +290,7 @@ export const adminService = {
   updateQuestion,
   deleteQuestion,
   getAllUsers,
+  createUser,
   updateUser,
   deleteUser,
   promoteUser,
@@ -237,4 +300,9 @@ export const adminService = {
   getPendingEnrollments,
   approveEnrollment,
   rejectEnrollment,
+  // categories
+  getAllCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 };

@@ -112,6 +112,8 @@ curl -X GET http://localhost:8080/api/courses
 ```
 
 #### 4. Create Course (Admin)
+
+- **Category**: previously free-text, now managed via `/api/categories` endpoint
 ```bash
 curl -X POST http://localhost:8080/api/courses \
   -H "Content-Type: application/json" \
@@ -161,6 +163,16 @@ Authorization: Bearer <token>
 - **PUT** `/users/change-password` - Change password
 
 ### Courses
+
+- **Category management** (Admin):
+  - `GET /api/categories`
+  - `POST /api/categories` (admin)
+  - `PUT /api/categories/:id` (admin)
+  - `DELETE /api/categories/:id` (admin)
+
+
+- **Filtering** available by category/instructor using query params on `/courses`
+
 - **GET** `/courses` - List courses
 - **POST** `/courses` - Create course (admin)
 - **PUT** `/courses/:id` - Update course (admin)

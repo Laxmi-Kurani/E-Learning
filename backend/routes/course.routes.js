@@ -3,11 +3,36 @@ const router = express.Router();
 const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
-// Get all courses
+// Get all courses (supports optional search/filter)
 router.get('/', async (req, res) => {
   try {
     const db = getPool();
-    const [courses] = await db.query('SELECT * FROM course ORDER BY created_at DESC');
+    const { search, category, instructor } = req.query;
+
+    let sql = 'SELECT * FROM course';
+    const params = [];
+    const conditions = [];
+
+    if (search) {
+      conditions.push('(title LIKE ? OR description LIKE ? OR instructor LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (category) {
+      conditions.push('category = ?');
+      params.push(category);
+    }
+    if (instructor) {
+      conditions.push('instructor = ?');
+      params.push(instructor);
+    }
+
+    if (conditions.length) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const [courses] = await db.query(sql, params);
     res.json(courses);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching courses', error: error.message });
