@@ -32,8 +32,14 @@ router.get('/my-certificates', verifyToken, async (req, res) => {
        ORDER BY c.issued_at DESC`,
       [req.userId]
     );
-    
-    res.json(certificates);
+    // ensure certificate_url is usable even when the field was left blank
+    const enhanced = certificates.map((c) => {
+      if (!c.certificate_url) {
+        c.certificate_url = generateCertificateUrl(c.user_id, c.course_id, req);
+      }
+      return c;
+    });
+    res.json(enhanced);
   } catch (error) {
     console.error('Error fetching certificates:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -59,7 +65,11 @@ router.get('/:certificateId', verifyToken, async (req, res) => {
       return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Certificate not found' });
     }
     
-    res.json(certificates[0]);
+    const cert = certificates[0];
+    if (cert && !cert.certificate_url) {
+      cert.certificate_url = generateCertificateUrl(cert.user_id, cert.course_id, req);
+    }
+    res.json(cert);
   } catch (error) {
     console.error('Error fetching certificate:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -68,6 +78,28 @@ router.get('/:certificateId', verifyToken, async (req, res) => {
   }
 });
 
+// Download certificate PDF (redirects to stored URL)
+router.get('/:certificateId/download', verifyToken, async (req, res) => {
+  try {
+    const db = getPool();
+    const [rows] = await db.query('SELECT certificate_url, user_id, course_id FROM certificate WHERE id = ?', [req.params.certificateId]);
+    if (rows.length === 0) {
+      return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Certificate not found' });
+    }
+    const url = rows[0].certificate_url || generateCertificateUrl(rows[0].user_id, rows[0].course_id, req);
+    // if the URL is relative, build full path using origin
+    if (url.startsWith('/')) {
+      const origin = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+      return res.redirect(origin.replace(/\/$/, '') + url);
+    }
+    return res.redirect(url);
+  } catch (err) {
+    console.error('Error downloading certificate:', err);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to download' });
+  }
+});
+
+// Issue certificate (Admin only) - called when assessment is passed
 // Issue certificate (Admin only) - called when assessment is passed
 router.post('/issue', verifyToken, isAdmin, async (req, res) => {
   try {
@@ -94,7 +126,11 @@ router.post('/issue', verifyToken, isAdmin, async (req, res) => {
     }
     
     // Generate certificate or use provided URL
-    const finalUrl = certificateUrl || generateCertificateUrl(userId, courseId);
+    // the generated URL now points to the frontend viewer (including
+    // a userId query parameter) so that a PDF can be produced on the
+    // client. pass the request object so the helper can build an
+    // absolute link based on the request origin or a FRONTEND_URL env var.
+    const finalUrl = certificateUrl || generateCertificateUrl(userId, courseId, req);
     
     // Insert or update certificate
     const [result] = await db.query(
@@ -136,27 +172,70 @@ router.put('/:certificateId/revoke', verifyToken, isAdmin, async (req, res) => {
   }
 });
 
-// Get all certificates (Admin only)
+// Get all certificates (Admin only) with search and filters
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
     const db = getPool();
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
-    
-    const [total] = await db.query('SELECT COUNT(*) as count FROM certificate');
-    const [certificates] = await db.query(
-      `SELECT c.*, u.username, u.email, co.title as course_title
+    const userId = req.query.userId;
+    const courseId = req.query.courseId;
+    const status = req.query.status;
+    const search = req.query.search; // username or email
+
+    // build count query with filters
+    let countSql = 'SELECT COUNT(*) as count FROM certificate c JOIN user u ON c.user_id = u.id WHERE 1=1';
+    const countParams = [];
+
+    let dataSql = `SELECT c.*, u.username, u.email, co.title as course_title
        FROM certificate c
        JOIN user u ON c.user_id = u.id
        JOIN course co ON c.course_id = co.id
-       ORDER BY c.issued_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
-    
+       WHERE 1=1`;
+    const dataParams = [];
+
+    if (userId && !isNaN(userId)) {
+      countSql += ' AND c.user_id = ?';
+      dataSql += ' AND c.user_id = ?';
+      countParams.push(userId);
+      dataParams.push(userId);
+    }
+    if (courseId && !isNaN(courseId)) {
+      countSql += ' AND c.course_id = ?';
+      dataSql += ' AND c.course_id = ?';
+      countParams.push(courseId);
+      dataParams.push(courseId);
+    }
+    if (status) {
+      countSql += ' AND c.status = ?';
+      dataSql += ' AND c.status = ?';
+      countParams.push(status);
+      dataParams.push(status);
+    }
+    if (search) {
+      countSql += ' AND (u.username LIKE ? OR u.email LIKE ?)';
+      dataSql += ' AND (u.username LIKE ? OR u.email LIKE ?)';
+      const term = `%${search}%`;
+      countParams.push(term, term);
+      dataParams.push(term, term);
+    }
+
+    const [total] = await db.query(countSql, countParams);
+    dataSql += ' ORDER BY c.issued_at DESC LIMIT ? OFFSET ?';
+    dataParams.push(limit, offset);
+
+    const [certificates] = await db.query(dataSql, dataParams);
+
+    // populate missing urls
+    const enhanced = certificates.map((c) => {
+      if (!c.certificate_url) {
+        c.certificate_url = generateCertificateUrl(c.user_id, c.course_id, req);
+      }
+      return c;
+    });
     res.json({
-      certificates,
+      certificates: enhanced,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total[0].count / limit),
@@ -175,10 +254,83 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
  * Generate certificate URL
  * In production, this would generate actual PDF certificates or use a service
  */
-function generateCertificateUrl(userId, courseId) {
-  const timestamp = Date.now();
-  const hash = require('crypto').randomBytes(8).toString('hex');
-  return `/certificates/${userId}-${courseId}-${hash}-${timestamp}.pdf`;
+// ---------------------------------------------------------------------------
+// Admin CRUD operations for certificates
+// ---------------------------------------------------------------------------
+
+// Create a certificate record (admin) - does not require passing check
+router.post('/', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { userId, courseId, certificateUrl, status } = req.body;
+    if (!userId || !courseId) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId and courseId are required' });
+    }
+    const db = getPool();
+    const url = certificateUrl || generateCertificateUrl(userId, courseId, req);
+    const certStatus = status || 'ISSUED';
+    const [result] = await db.query(
+      'INSERT INTO certificate (user_id, course_id, certificate_url, status) VALUES (?, ?, ?, ?)',
+      [userId, courseId, url, certStatus]
+    );
+    res.status(201).json({ message: 'Certificate created', certificateId: result.insertId });
+  } catch (error) {
+    console.error('Error creating certificate:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create certificate' });
+  }
+});
+
+// Update certificate (admin)
+router.put('/:certificateId', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const { certificateUrl, status } = req.body;
+    const fields = [];
+    const params = [];
+    if (certificateUrl) {
+      fields.push('certificate_url = ?');
+      params.push(certificateUrl);
+    }
+    if (status) {
+      fields.push('status = ?');
+      params.push(status);
+    }
+    if (fields.length === 0) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Nothing to update' });
+    }
+    params.push(req.params.certificateId);
+    await getPool().query(`UPDATE certificate SET ${fields.join(', ')} WHERE id = ?`, params);
+    res.json({ message: 'Certificate updated' });
+  } catch (error) {
+    console.error('Error updating certificate:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to update certificate' });
+  }
+});
+
+// Delete certificate (admin)
+router.delete('/:certificateId', verifyToken, isAdmin, async (req, res) => {
+  try {
+    await getPool().query('DELETE FROM certificate WHERE id = ?', [req.params.certificateId]);
+    res.json({ message: 'Certificate deleted' });
+  } catch (error) {
+    console.error('Error deleting certificate:', error);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to delete certificate' });
+  }
+});
+
+// build a URL that clients can visit to view/download the certificate.
+// we default to the request origin (which in production will usually be
+// the same host serving the frontend) but allow override via
+// FRONTEND_URL environment variable so the backend can live on a
+// different domain than the UI.
+function generateCertificateUrl(userId, courseId, req) {
+  const origin =
+    process.env.FRONTEND_URL ||
+    (req && `${req.protocol}://${req.get('host')}`) ||
+    '';
+
+  // include userId so that the certificate page can render any user
+  // (not just the currently logged in one) and optionally trigger an
+  // automatic download via query param.
+  return `${origin.replace(/\/$/, '')}/certificate/${courseId}?userId=${userId}`;
 }
 
 module.exports = router;

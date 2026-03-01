@@ -8,6 +8,7 @@ function CourseModal({ isOpen, onClose, onSuccess, courseId = null, mode = "add"
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const isEditMode = mode === "edit" || courseId !== null;
   const modalTitle = isEditMode ? "Edit Course" : "Add New Course";
@@ -20,7 +21,17 @@ function CourseModal({ isOpen, onClose, onSuccess, courseId = null, mode = "add"
     } else if (isOpen && !isEditMode) {
       form.resetFields();
     }
+    loadCategories();
   }, [isOpen, courseId, isEditMode]);
+
+  const loadCategories = async () => {
+    try {
+      const res = await adminService.getAllCategories();
+      if (res.success) setCategories(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchCourseData = async () => {
     setFetchingData(true);
@@ -173,12 +184,12 @@ function CourseModal({ isOpen, onClose, onSuccess, courseId = null, mode = "add"
               name="category"
               rules={[{ required: true, message: "Category is required" }]}
             >
-              <Input placeholder="e.g., Programming" />
-            </Form.Item>
-
-            <Form.Item
-              label="Price"
-              name="price"
+            <select className="w-full border rounded px-2 py-1">
+              <option value="">Select category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
               rules={[
                 { required: true, message: "Price is required" },
                 { type: "number", min: 0, message: "Price must be a positive number" },

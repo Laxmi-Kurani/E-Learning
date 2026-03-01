@@ -69,6 +69,7 @@ app.use('/api/assessments', require('./routes/assessment.routes'));
 app.use('/api/discussions', require('./routes/discussion.routes'));
 app.use('/api/feedbacks', require('./routes/feedback.routes'));
 app.use('/api/certificates', require('./routes/certificate.routes'));
+app.use('/api/categories', require('./routes/category.routes'));
 app.use('/api/analytics', require('./routes/analytics.routes'));
 app.use('/api/notifications', require('./routes/notification.routes'));
 

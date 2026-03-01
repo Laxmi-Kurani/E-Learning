@@ -84,12 +84,19 @@ Authorization: Bearer <token>
 - **Auth**: Required
 - **Response**: User profile object
 
+#### Create User (Admin)
+- **POST** `/users`
+- **Auth**: Requires ADMIN
+- **Body**: `{ username, email, password, role? }`
+- **Response**: `{ userId, message }`
+
 ---
 
 ### 4. Courses (`/courses`)
 
 #### Get All Courses
 - **GET** `/courses`
+- **Query&nbsp;Params** (optional): `search`, `category`, `instructor`
 - **Response**: `[{ id, title, description, instructor, level, category, price, ... }]`
 
 #### Get Course by ID
@@ -110,6 +117,32 @@ Authorization: Bearer <token>
 
 #### Delete Course (Admin)
 - **DELETE** `/courses/:id`
+- **Auth**: Requires ADMIN role
+- **Response**: `{ message }`
+
+---
+
+### 9. Categories (`/categories`)
+
+#### List Categories
+- **GET** `/categories`
+- **Query Params** (optional): `search` (filters by name)
+- **Response**: `[{ id, name, created_at, updated_at }]`
+
+#### Create Category (Admin)
+- **POST** `/categories`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ name }`
+- **Response**: `{ categoryId, message }`
+
+#### Update Category (Admin)
+- **PUT** `/categories/:id`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ name }`
+- **Response**: `{ message }`
+
+#### Delete Category (Admin)
+- **DELETE** `/categories/:id`
 - **Auth**: Requires ADMIN role
 - **Response**: `{ message }`
 
@@ -211,6 +244,38 @@ Authorization: Bearer <token>
 
 ---
 
+#### **Admin Operations**
+
+##### List Assessments (with filters/search)
+- **GET** `/assessments`
+- **Auth**: Requires ADMIN role
+- **Query Params**: `page`, `limit`, `courseId`, `status` (PASSED/FAILED), `userId`, `search` (username/email)
+- **Response**: `{ assessments, pagination: { currentPage, totalPages, totalRecords } }`
+
+##### Get Assessment by ID
+- **GET** `/assessments/:id`
+- **Auth**: Requires ADMIN role
+- **Response**: Assessment object with user and course info
+
+##### Create Assessment
+- **POST** `/assessments`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ userId, courseId, score, totalQuestions, passed? }`
+- **Response**: `{ assessmentId, message }`
+
+##### Update Assessment
+- **PUT** `/assessments/:id`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ score?, totalQuestions?, passed? }`
+- **Response**: `{ message }`
+
+##### Delete Assessment
+- **DELETE** `/assessments/:id`
+- **Auth**: Requires ADMIN role
+- **Response**: `{ message }`
+
+---
+
 ### 9. Discussions (`/discussions`)
 
 #### Get Course Discussions
@@ -266,13 +331,40 @@ Authorization: Bearer <token>
 - **Auth**: Required
 - **Response**: Certificate object
 
-#### Issue Certificate (Admin)
+---
+
+#### **Admin Operations**
+
+##### List Certificates (with filters/search)
+- **GET** `/certificates`
+- **Auth**: Requires ADMIN role
+- **Query Params**: `page`, `limit`, `userId`, `courseId`, `status`, `search` (username/email)
+- **Response**: `{ certificates, pagination: { currentPage, totalPages, totalRecords } }`
+
+##### Create Certificate
+- **POST** `/certificates`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ userId, courseId, certificateUrl?, status? }`
+- **Response**: `{ certificateId, message }`
+
+##### Update Certificate
+- **PUT** `/certificates/:certificateId`
+- **Auth**: Requires ADMIN role
+- **Body**: `{ certificateUrl?, status? }`
+- **Response**: `{ message }`
+
+##### Delete Certificate
+- **DELETE** `/certificates/:certificateId`
+- **Auth**: Requires ADMIN role
+- **Response**: `{ message }`
+
+##### Issue Certificate (Admin)
 - **POST** `/certificates/issue`
 - **Auth**: Requires ADMIN role
 - **Body**: `{ userId, courseId, certificateUrl? }`
 - **Response**: `{ certificateId, message, certificateUrl }`
 
-#### Revoke Certificate (Admin)
+##### Revoke Certificate (Admin)
 - **PUT** `/certificates/:certificateId/revoke`
 - **Auth**: Requires ADMIN role
 - **Response**: `{ message }`

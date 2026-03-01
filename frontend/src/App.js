@@ -10,6 +10,8 @@ import Learnings from './pages/learning/learnings';
 import Home from './pages/landing/Home';
 import DUsers from './pages/dashBoard/DUsers';
 import DCourses from './pages/dashBoard/DCourses';
+import DCategories from './pages/dashBoard/DCategories';
+import DInstructors from './pages/dashBoard/DInstructors';
 import Assessment from './pages/assessment/Assessment';
 import ErrorPage from './pages/error/ErrorPage';
 import AddQuestions from './pages/dashBoard/AddQuestions';
@@ -37,6 +39,8 @@ function App() {
           <Route path='/profile' Component={Profile}></Route>
           <Route path='/Learnings' Component={Learnings}></Route>
           <Route path='/Dcourses' Component={DCourses}></Route>
+          <Route path='/DCategories' Component={DCategories}></Route>
+          <Route path='/DInstructors' Component={DInstructors}></Route>
           <Route path='/Dusers' Component={DUsers}></Route>
           <Route path='/Performance' Component={Performance} />
           <Route path='*' Component={ErrorPage}></Route>

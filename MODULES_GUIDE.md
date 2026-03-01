@@ -95,7 +95,7 @@ Features:
 - Profile updates
 - Password changes
 - Dashboard statistics
-- User listing (admin)
+- User listing (admin) including status (isActive) and filters by role/status
 
 **Key Endpoints:**
 - `GET /profile` - Get user profile

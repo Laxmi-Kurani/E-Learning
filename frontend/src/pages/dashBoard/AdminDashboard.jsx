@@ -6,6 +6,8 @@ import Users from "./DUsers";
 import Enrollments from "./DEnrollments";
 import DCertificates from "./DCertificates";
 import DAssessments from "./DAssessments";
+import DCategories from "./DCategories";
+import DInstructors from "./DInstructors";
 import { authService } from "../../api/auth.service";
 
 
@@ -22,8 +24,12 @@ function AdminDashboard() {
         return <Dashboard isAuthenticated = {isAuthenticated} />;
       case "user":
         return <Users />;
+      case "instructors":
+        return <DInstructors />;
       case "courses":
         return <Courses />;
+      case "categories":
+        return <DCategories />;
       case "assessments":
         return <DAssessments />;
       case "enrollments":

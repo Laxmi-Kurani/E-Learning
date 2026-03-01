@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEdit, faTrash, faPlus, faBookOpen, faClipboardList } from "@fortawesome/free-solid-svg-icons";
-import { message } from "antd";
+import { message, Input } from "antd";
 import { adminService } from "../../api/admin.service";
 import CourseModal from "./CourseModal";
 import DeleteModal from "./DeleteModal";
@@ -10,6 +10,11 @@ import AddQuestion from "./AddQuestions";
 function Courses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterInstructor, setFilterInstructor] = useState("");
+  const [allCategories, setAllCategories] = useState([]);
+  const [allInstructors, setAllInstructors] = useState([]);
 
   const [courseModal, setCourseModal] = useState({
     isOpen: false,
@@ -26,12 +31,21 @@ function Courses() {
 
   useEffect(() => {
     fetchCourses();
+    fetchFilterLists();
   }, []);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [searchText, filterCategory, filterInstructor]);
 
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const result = await adminService.getAllCourses();
+      const filters = {};
+      if (searchText) filters.search = searchText;
+      if (filterCategory) filters.category = filterCategory;
+      if (filterInstructor) filters.instructor = filterInstructor;
+      const result = await adminService.getAllCourses(filters);
       if (result.success) {
         setCourses(result.data);
       } else {
@@ -41,6 +55,17 @@ function Courses() {
       message.error("Failed to fetch courses");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFilterLists = async () => {
+    try {
+      const catRes = await adminService.getAllCategories();
+      if (catRes.success) setAllCategories(catRes.data);
+      const instrRes = await adminService.getAllUsers({ role: "INSTRUCTOR" });
+      if (instrRes.success) setAllInstructors(instrRes.data);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -99,6 +124,47 @@ function Courses() {
                 <FontAwesomeIcon icon={faPlus} className="text-sm" />
                 Add New Course
               </button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4">
+              <Input
+                placeholder="Search courses"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ width: 200 }}
+                allowClear
+              />
+              <select
+                className="border rounded px-2 py-1"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {allCategories.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+              <select
+                className="border rounded px-2 py-1"
+                value={filterInstructor}
+                onChange={(e) => setFilterInstructor(e.target.value)}
+              >
+                <option value="">All Instructors</option>
+                {allInstructors.map((i) => (
+                  <option key={i.id} value={i.username}>{i.username}</option>
+                ))}
+              </select>
+              {(searchText || filterCategory || filterInstructor) && (
+                <button
+                  className="text-sm text-blue-600 underline"
+                  onClick={() => {
+                    setSearchText("");
+                    setFilterCategory("");
+                    setFilterInstructor("");
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           </div>
 

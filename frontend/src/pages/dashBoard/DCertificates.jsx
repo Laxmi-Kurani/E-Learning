@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import api from '../../api/api';
 import certificateService from '../../api/certificate.service';
+import CertificateModal from './CertificateModal';
+import DeleteModal from './DeleteModal';
 
 function DCertificates() {
   const [certificates, setCertificates] = useState([]);
@@ -9,16 +12,34 @@ function DCertificates() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCourse, setFilterCourse] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [courses, setCourses] = useState([]);
+  const [certificateModal, setCertificateModal] = useState({
+    isOpen: false,
+    mode: 'add',
+    certificateId: null,
+  });
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    certificate: null,
+  });
   const limit = 10;
 
   useEffect(() => {
     fetchCertificates();
-  }, [page]);
+    fetchCourses();
+  }, [page, searchTerm, filterCourse, filterStatus]);
 
   const fetchCertificates = async () => {
     try {
       setLoading(true);
-      const response = await certificateService.getAllCertificates(page, limit);
+      const params = { page, limit };
+      if (searchTerm) params.search = searchTerm;
+      if (filterCourse) params.courseId = filterCourse;
+      if (filterStatus) params.status = filterStatus;
+      const response = await certificateService.searchCertificates(params);
       setCertificates(response.data.certificates || response.data);
       setTotalPages(response.data.pagination?.totalPages || 1);
       setError('');
@@ -43,6 +64,48 @@ function DCertificates() {
     }
   };
 
+  const openAddCertificate = () => {
+    setCertificateModal({ isOpen: true, mode: 'add', certificateId: null });
+  };
+
+  const openEditCertificate = (cert) => {
+    setCertificateModal({ isOpen: true, mode: 'edit', certificateId: cert.id });
+  };
+
+  const closeCertificateModal = () => {
+    setCertificateModal({ isOpen: false, mode: 'add', certificateId: null });
+  };
+
+  const handleCertificateSuccess = () => {
+    fetchCertificates();
+  };
+
+  const openDeleteCertificate = (cert) => {
+    setDeleteModal({ isOpen: true, certificate: cert });
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModal({ isOpen: false, certificate: null });
+  };
+
+  const handleDeleteCertificate = async (cert) => {
+    return await certificateService.deleteCertificate(cert.id);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data } = await api.get('/api/courses');
+      setCourses(Array.isArray(data) ? data : data.data || []);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
+
   const handleViewDetails = (cert) => {
     setSelectedCertificate(cert);
     setShowModal(true);
@@ -60,6 +123,50 @@ function DCertificates() {
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Certificate Management</h1>
+        <button
+          onClick={openAddCertificate}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+        >
+          + Add
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <input
+              type="text"
+              placeholder="Search by user or course"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <select
+              value={filterCourse}
+              onChange={(e) => { setFilterCourse(e.target.value); setPage(1); }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Courses</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <select
+              value={filterStatus}
+              onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="ISSUED">Issued</option>
+              <option value="REVOKED">Revoked</option>
+              <option value="NOT_ISSUED">Not Issued</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -110,9 +217,21 @@ function DCertificates() {
                     <td className="px-6 py-4">
                       <button
                         onClick={() => handleViewDetails(cert)}
-                        className="text-blue-600 hover:text-blue-800 font-medium text-sm mr-4"
+                        className="text-blue-600 hover:text-blue-800 font-medium text-sm mr-2"
                       >
                         View
+                      </button>
+                      <button
+                        onClick={() => openEditCertificate(cert)}
+                        className="text-green-600 hover:text-green-800 font-medium text-sm mr-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => openDeleteCertificate(cert)}
+                        className="text-red-600 hover:text-red-800 font-medium text-sm mr-2"
+                      >
+                        Delete
                       </button>
                       {cert.status === 'ISSUED' && (
                         <button
@@ -245,6 +364,28 @@ function DCertificates() {
           </div>
         </div>
       )}
+
+      {/* Add/Edit Certificate Modal */}
+      <CertificateModal
+        isOpen={certificateModal.isOpen}
+        mode={certificateModal.mode}
+        certificateId={certificateModal.certificateId}
+        onClose={closeCertificateModal}
+        onSuccess={handleCertificateSuccess}
+      />
+
+      {/* Delete Modal */}
+      <DeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={closeDeleteModal}
+        onSuccess={handleCertificateSuccess}
+        onDelete={handleDeleteCertificate}
+        item={deleteModal.certificate}
+        itemType="Certificate"
+        title="Delete Certificate"
+        description="Are you sure you want to delete this certificate?"
+        itemDisplayName={`ID ${deleteModal.certificate?.id}`}
+      />
     </div>
   );
 }
