@@ -90,56 +90,59 @@ function DEnrollments() {
             </div>
           ) : (
             <div className="grid gap-4">
-              {pendingRequests.map((request) => (
-                <div
-                  key={request.id}
-                  className="group bg-white border border-gray-200 rounded-xl hover:shadow-lg hover:border-orange-200 transition-all duration-300 overflow-hidden"
-                >
-                  <div className="p-6 flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-yellow-400 rounded-full flex items-center justify-center text-white font-bold">
-                          {request.username.charAt(0).toUpperCase()}
+              {pendingRequests.map((request) => {
+                const enrollmentId = request.id || request._id;
+                return (
+                  <div
+                    key={enrollmentId}
+                    className="group bg-white border border-gray-200 rounded-xl hover:shadow-lg hover:border-orange-200 transition-all duration-300 overflow-hidden"
+                  >
+                    <div className="p-6 flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-yellow-400 rounded-full flex items-center justify-center text-white font-bold">
+                            {request.username?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">{request.username}</h3>
+                            <p className="text-sm text-gray-500">{request.email}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">{request.username}</h3>
-                          <p className="text-sm text-gray-500">{request.email}</p>
+                        
+                        <div className="ml-13 mt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FontAwesomeIcon icon={faHourglass} className="text-orange-500 text-sm" />
+                            <span className="text-sm font-medium text-gray-700">Course:</span>
+                            <span className="text-sm text-gray-900 font-semibold">{request.course_title}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">
+                              Requested: {new Date(request.enrolled_at).toLocaleDateString()}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="ml-13 mt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FontAwesomeIcon icon={faHourglass} className="text-orange-500 text-sm" />
-                          <span className="text-sm font-medium text-gray-700">Course:</span>
-                          <span className="text-sm text-gray-900 font-semibold">{request.course_title}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            Requested: {new Date(request.enrolled_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 ml-6">
-                      <button
-                        onClick={() => handleApprove(request.id)}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm font-medium rounded-lg transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        <FontAwesomeIcon icon={faCheck} />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(request.id)}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-sm font-medium rounded-lg transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        <FontAwesomeIcon icon={faTimes} />
-                        Reject
-                      </button>
+                      <div className="flex items-center gap-3 ml-6">
+                        <button
+                          onClick={() => handleApprove(enrollmentId)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm font-medium rounded-lg transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          <FontAwesomeIcon icon={faCheck} />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReject(enrollmentId)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-sm font-medium rounded-lg transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          <FontAwesomeIcon icon={faTimes} />
+                          Reject
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

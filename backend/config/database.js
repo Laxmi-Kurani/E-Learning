@@ -57,4 +57,14 @@ const setupPool = async () => {
   }
 };
 
-module.exports = { setupPool, getPool: () => promisePool };
+// expose sequelize instance for apps migrating to ORM
+let sequelizeInstance;
+try {
+  const { sequelize } = require('../models');
+  sequelizeInstance = sequelize;
+} catch (e) {
+  // models may not yet be initialized
+  sequelizeInstance = null;
+}
+
+module.exports = { setupPool, getPool: () => promisePool, getSequelize: () => sequelizeInstance };

@@ -78,7 +78,8 @@ function Users({ initialRole = '' }) {
   };
 
   const handleEdit = (user) => {
-    setSelectedUser(user);
+    const userId = user.id || user._id;
+    setSelectedUser({ ...user, id: userId });
     editForm.setFieldsValue({
       username: user.username,
       email: user.email,
@@ -111,6 +112,7 @@ function Users({ initialRole = '' }) {
   };
 
   const handleDelete = (user) => {
+    const userId = user.id || user._id;
     Modal.confirm({
       title: 'Delete User',
       content: `Are you sure you want to delete user "${user.username}"? This action cannot be undone.`,
@@ -119,7 +121,7 @@ function Users({ initialRole = '' }) {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          const res = await adminService.deleteUser(user.id);
+          const res = await adminService.deleteUser(userId);
           if (res.success) {
             message.success("User deleted successfully");
             fetchUsers();
@@ -134,6 +136,7 @@ function Users({ initialRole = '' }) {
   };
 
   const handlePromote = async (user) => {
+    const userId = user.id || user._id;
     Modal.confirm({
       title: 'Promote User',
       content: `Are you sure you want to promote "${user.username}" to admin?`,
@@ -141,7 +144,7 @@ function Users({ initialRole = '' }) {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          const res = await adminService.promoteUser(user.id);
+          const res = await adminService.promoteUser(userId);
           if (res.success) {
             message.success("User promoted to admin successfully");
             fetchUsers();
@@ -156,6 +159,7 @@ function Users({ initialRole = '' }) {
   };
 
   const handleDemote = async (user) => {
+    const userId = user.id || user._id;
     Modal.confirm({
       title: 'Demote Admin',
       content: `Are you sure you want to demote admin "${user.username}" to regular user?`,
@@ -164,7 +168,7 @@ function Users({ initialRole = '' }) {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          const res = await adminService.demoteUser(user.id);
+          const res = await adminService.demoteUser(userId);
           if (res.success) {
             message.success("Admin demoted to user successfully");
             fetchUsers();
@@ -378,7 +382,7 @@ function Users({ initialRole = '' }) {
           columns={columns}
           dataSource={users}
           loading={loading}
-          rowKey="id"
+          rowKey={(record) => record.id || record._id}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

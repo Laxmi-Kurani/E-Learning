@@ -82,7 +82,7 @@ async function getAllUsers(filters = {}) {
     const { data } = await api.get(url);
     return { success: true, data };
   } catch (error) {
-    console.error("Error fetching users:", error);
+    console.error("Error fetching users:", error.response?.data || error.message || error);
     return { success: false, error: "Could not fetch users" };
   }
 }

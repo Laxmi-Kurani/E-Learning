@@ -1,6 +1,8 @@
 import { Modal, Form, Input, InputNumber, Select, message } from "antd";
 import { useState, useEffect } from "react";
 import { assessmentService } from "../../api/assessment.service";
+import { adminService } from "../../api/admin.service";
+import api from "../../api/api";
 
 const { Option } = Select;
 
@@ -8,6 +10,8 @@ function AssessmentModal({ isOpen, onClose, onSuccess, assessmentId = null, mode
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [courses, setCourses] = useState([]);
 
   const isEditMode = mode === "edit" || assessmentId !== null;
   const modalTitle = isEditMode ? "Edit Assessment" : "Add New Assessment";
@@ -15,12 +19,36 @@ function AssessmentModal({ isOpen, onClose, onSuccess, assessmentId = null, mode
   const loadingText = isEditMode ? "Updating..." : "Adding...";
 
   useEffect(() => {
-    if (isOpen && isEditMode && assessmentId) {
-      fetchAssessment();
-    } else if (isOpen && !isEditMode) {
-      form.resetFields();
+    if (isOpen) {
+      fetchUsers();
+      fetchCourses();
+      if (isEditMode && assessmentId) {
+        fetchAssessment();
+      } else if (!isEditMode) {
+        form.resetFields();
+      }
     }
   }, [isOpen, assessmentId, isEditMode]);
+
+  const fetchUsers = async () => {
+    try {
+      const result = await adminService.getAllUsers();
+      if (result.success) {
+        setUsers(result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data } = await api.get('/api/courses');
+      setCourses(Array.isArray(data) ? data : data.data || []);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
 
   const fetchAssessment = async () => {
     setFetchingData(true);
@@ -28,8 +56,8 @@ function AssessmentModal({ isOpen, onClose, onSuccess, assessmentId = null, mode
       const result = await assessmentService.getAssessmentById(assessmentId);
       if (result.success) {
         form.setFieldsValue({
-          userId: result.data.user_id,
-          courseId: result.data.course_id,
+          userId: String(result.data.user_id),
+          courseId: String(result.data.course_id),
           score: result.data.score,
           totalQuestions: result.data.total_questions,
           passed: result.data.passed ? "PASSED" : "FAILED",
@@ -112,19 +140,54 @@ function AssessmentModal({ isOpen, onClose, onSuccess, assessmentId = null, mode
           }}
         >
           <Form.Item
-            label="User ID"
+            label="User"
             name="userId"
-            rules={[{ required: true, message: "User ID is required" }]}
+            rules={[{ required: true, message: "User is required" }]}
           >
-            <Input placeholder="User ID" type="number" />
+            <Select
+              showSearch
+              placeholder="Select a user"
+              filterOption={(input, option) => {
+                const searchText = `${option.username} ${option.email}`.toLowerCase();
+                return searchText.includes(input.toLowerCase());
+              }}
+            >
+              {users.map((user) => (
+                <Option 
+                  key={user.id || user._id} 
+                  value={String(user.id || user._id)}
+                  username={user.username}
+                  email={user.email}
+                >
+                  {user.username} ({user.email})
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <Form.Item
-            label="Course ID"
+            label="Course"
             name="courseId"
-            rules={[{ required: true, message: "Course ID is required" }]}
+            rules={[{ required: true, message: "Course is required" }]}
           >
-            <Input placeholder="Course ID" type="number" />
+            <Select
+              showSearch
+              placeholder="Select a course"
+              filterOption={(input, option) => {
+                const searchText = option.title?.toLowerCase() || '';
+                return searchText.includes(input.toLowerCase());
+              }}
+            >
+              {courses.map((course) => (
+                <Option 
+                  key={course.id || course._id} 
+                  value={String(course.id || course._id)}
+                  title={course.title}
+                >
+                  {course.title}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
 
           <div className="grid grid-cols-2 gap-4">

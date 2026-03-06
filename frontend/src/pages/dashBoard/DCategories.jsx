@@ -44,7 +44,8 @@ function Categories() {
   };
 
   const openEditModal = (cat) => {
-    setCategoryModal({ isOpen: true, mode: "edit", categoryId: cat.id });
+    const categoryId = cat.id || cat._id;
+    setCategoryModal({ isOpen: true, mode: "edit", categoryId });
   };
 
   const closeCategoryModal = () => {
@@ -64,7 +65,8 @@ function Categories() {
   };
 
   const handleDeleteCategory = async (cat) => {
-    return await adminService.deleteCategory(cat.id);
+    const categoryId = cat.id || cat._id;
+    return await adminService.deleteCategory(categoryId);
   };
 
   const handleDeleteSuccess = () => {
@@ -116,7 +118,7 @@ function Categories() {
         columns={columns}
         dataSource={categories}
         loading={loading}
-        rowKey="id"
+        rowKey={(record) => record.id || record._id}
         pagination={{ pageSize: 10 }}
       />
 

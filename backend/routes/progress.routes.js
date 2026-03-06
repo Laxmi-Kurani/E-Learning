@@ -2,30 +2,56 @@ const express = require('express');
 const router = express.Router();
 const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
+const { DB_TYPE, Progress } = require('../models');
 
-// Update progress
-router.post('/update', verifyToken, async (req, res) => {
+// Get user progress for a course
+router.get('/:userId/:courseId', verifyToken, async (req, res) => {
   try {
-    const db = getPool();
-    const { courseId, completionPercentage } = req.body;
-    const completed = completionPercentage >= 100;
+    if (DB_TYPE === 'mongodb') {
+      const progress = await Progress.findOne({
+        user_id: req.params.userId,
+        course_id: req.params.courseId
+      }).lean();
+      
+      if (!progress) {
+        return res.json({ completion_percentage: 0, completed: false, last_accessed: null });
+      }
+      
+      return res.json(progress);
+    }
     
-    await db.query(
-      'UPDATE progress SET completion_percentage=?, completed=? WHERE user_id=? AND course_id=?',
-      [completionPercentage, completed, req.userId, courseId]
+    const db = getPool();
+    const [progress] = await db.query(
+      'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
+      [req.params.userId, req.params.courseId]
     );
     
-    res.json({ message: 'Progress updated successfully' });
+    if (progress.length === 0) {
+      return res.json({ completion_percentage: 0, completed: false, last_accessed: null });
+    }
+    
+    res.json(progress[0]);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating progress', error: error.message });
+    console.error('Error fetching progress:', error);
+    res.status(500).json({ message: 'Error fetching progress', error: error.message });
   }
 });
 
 // Update video duration
-router.put('/update-duration', verifyToken, async (req, res) => {
+router.post('/update-duration', verifyToken, async (req, res) => {
   try {
     const { userId, courseId, duration } = req.body;
     
+    if (DB_TYPE === 'mongodb') {
+      await Progress.findOneAndUpdate(
+        { user_id: userId, course_id: courseId },
+        { user_id: userId, course_id: courseId, completion_percentage: 0, completed: false },
+        { upsert: true, new: true }
+      );
+      return res.json({ message: 'Duration updated successfully' });
+    }
+    
+    const db = getPool();
     // Check if progress record exists
     const [existing] = await db.query(
       'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
@@ -48,7 +74,7 @@ router.put('/update-duration', verifyToken, async (req, res) => {
 });
 
 // Update video progress
-router.put('/update-progress', verifyToken, async (req, res) => {
+router.post('/update-progress', verifyToken, async (req, res) => {
   try {
     const { userId, courseId, playedTime, duration } = req.body;
     
@@ -59,6 +85,22 @@ router.put('/update-progress', verifyToken, async (req, res) => {
     const completionPercentage = Math.min(Math.ceil((playedTime / duration) * 100), 100);
     const completed = completionPercentage >= 100;
     
+    if (DB_TYPE === 'mongodb') {
+      await Progress.findOneAndUpdate(
+        { user_id: userId, course_id: courseId },
+        { 
+          user_id: userId, 
+          course_id: courseId, 
+          completion_percentage: completionPercentage, 
+          completed,
+          last_accessed: new Date()
+        },
+        { upsert: true, new: true }
+      );
+      return res.json({ message: 'Progress updated successfully', completionPercentage });
+    }
+    
+    const db = getPool();
     // Check if progress record exists
     const [existing] = await db.query(
       'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
@@ -86,28 +128,50 @@ router.put('/update-progress', verifyToken, async (req, res) => {
   }
 });
 
-// Get user progress for a course
-router.get('/:userId/:courseId', verifyToken, async (req, res) => {
+// Update progress
+router.post('/update', verifyToken, async (req, res) => {
   try {
-    const db = getPool();
-    const [progress] = await db.query(
-      'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
-      [req.params.userId, req.params.courseId]
-    );
+    const { courseId, completionPercentage } = req.body;
+    const completed = completionPercentage >= 100;
     
-    if (progress.length === 0) {
-      return res.json({ completion_percentage: 0, completed: false, last_accessed: null });
+    if (DB_TYPE === 'mongodb') {
+      await Progress.findOneAndUpdate(
+        { user_id: req.userId, course_id: courseId },
+        { completion_percentage: completionPercentage, completed, last_accessed: new Date() },
+        { upsert: true, new: true }
+      );
+      return res.json({ message: 'Progress updated successfully' });
     }
     
-    res.json(progress[0]);
+    const db = getPool();
+    await db.query(
+      'UPDATE progress SET completion_percentage=?, completed=? WHERE user_id=? AND course_id=?',
+      [completionPercentage, completed, req.userId, courseId]
+    );
+    
+    res.json({ message: 'Progress updated successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching progress', error: error.message });
+    console.error('Error updating progress:', error);
+    res.status(500).json({ message: 'Error updating progress', error: error.message });
   }
 });
 
 // Get user progress for a course (alternative route using token)
 router.get('/:courseId', verifyToken, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const progress = await Progress.findOne({
+        user_id: req.userId,
+        course_id: req.params.courseId
+      }).lean();
+      
+      if (!progress) {
+        return res.json({ completion_percentage: 0, completed: false });
+      }
+      
+      return res.json(progress);
+    }
+    
     const db = getPool();
     const [progress] = await db.query(
       'SELECT * FROM progress WHERE user_id = ? AND course_id = ?',
@@ -120,6 +184,7 @@ router.get('/:courseId', verifyToken, async (req, res) => {
     
     res.json(progress[0]);
   } catch (error) {
+    console.error('Error fetching progress:', error);
     res.status(500).json({ message: 'Error fetching progress', error: error.message });
   }
 });
@@ -127,6 +192,19 @@ router.get('/:courseId', verifyToken, async (req, res) => {
 // Get all user progress
 router.get('/', verifyToken, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const progress = await Progress.find({ user_id: req.userId })
+        .populate('course_id', 'title')
+        .lean();
+      
+      const normalized = progress.map(p => ({
+        ...p,
+        course_title: p.course_id?.title
+      }));
+      
+      return res.json(normalized);
+    }
+    
     const db = getPool();
     const [progress] = await db.query(
       `SELECT p.*, c.title as course_title 
@@ -137,6 +215,7 @@ router.get('/', verifyToken, async (req, res) => {
     );
     res.json(progress);
   } catch (error) {
+    console.error('Error fetching progress:', error);
     res.status(500).json({ message: 'Error fetching progress', error: error.message });
   }
 });

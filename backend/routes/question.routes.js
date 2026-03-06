@@ -5,11 +5,49 @@ const { verifyToken, isAdmin } = require('../middleware/auth');
 const { validateQuestion } = require('../middleware/validation');
 const { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } = require('../utils/constants');
 const { getPaginationParams, handleDatabaseError } = require('../utils/helpers');
+const { DB_TYPE, Question, Course } = require('../models');
 
 // Get all questions (Admin only) - with pagination, search, filter
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const { limit, offset } = getPaginationParams(req.query);
+      const search = req.query.search || '';
+      const courseId = req.query.courseId;
+      
+      const filter = {};
+      if (search) {
+        filter.question_text = { $regex: search, $options: 'i' };
+      }
+      if (courseId) {
+        filter.course_id = courseId;
+      }
+      
+      const total = await Question.countDocuments(filter);
+      const questions = await Question.find(filter)
+        .sort({ created_at: -1 })
+        .limit(limit)
+        .skip(offset)
+        .lean();
+        
+      return res.json({
+        data: questions,
+        pagination: {
+          currentPage: Math.floor(offset / limit) + 1,
+          limit,
+          totalRecords: total,
+          totalPages: Math.ceil(total / limit),
+          hasNextPage: offset + limit < total,
+          hasPrevPage: offset > 0
+        }
+      });
+    }
+    
     const db = getPool();
+    if (!db) {
+      return res.status(500).json({ message: 'Database not initialized' });
+    }
+    
     const { limit, offset } = getPaginationParams(req.query);
     const search = req.query.search || '';
     const courseId = req.query.courseId;
@@ -22,7 +60,6 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
                     FROM question WHERE 1=1`;
     let dataParams = [];
     
-    // Apply search filter
     if (search) {
       query += ' AND question_text LIKE ?';
       dataQuery += ' AND question_text LIKE ?';
@@ -31,7 +68,6 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
       dataParams.push(searchTerm);
     }
     
-    // Apply course filter
     if (courseId && !isNaN(courseId)) {
       query += ' AND course_id = ?';
       dataQuery += ' AND course_id = ?';
@@ -39,11 +75,9 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
       dataParams.push(courseId);
     }
     
-    // Get total count
     const [countResult] = await db.query(query, countParams);
     const total = countResult[0].count;
     
-    // Get paginated data
     dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     dataParams.push(limit, offset);
     

@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
+const { User, DB_TYPE } = require('../models');
 
 // Register
 router.post('/register', async (req, res) => {
@@ -20,10 +21,34 @@ router.post('/register', async (req, res) => {
       linkedin_url, 
       github_url 
     } = req.body;
-    const db = getPool();
-    
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
+    if (DB_TYPE === 'mongodb') {
+      try {
+        const user = new User({
+          username,
+          email,
+          password: hashedPassword,
+          mobileNumber,
+          dob,
+          gender,
+          location,
+          profession,
+          linkedin_url,
+          github_url,
+          role: 'USER'
+        });
+        const saved = await user.save();
+        return res.status(201).json({ message: 'User registered successfully', userId: saved._id });
+      } catch (err) {
+        if (err.code === 11000) {
+          return res.status(400).json({ error: 'Email already exists' });
+        }
+        throw err;
+      }
+    }
+
+    const db = getPool();
     const [result] = await db.query(
       `INSERT INTO user (username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -32,7 +57,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({ message: 'User registered successfully', userId: result.insertId });
   } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
+    if (DB_TYPE !== 'mongodb' && error.code === 'ER_DUP_ENTRY') {
       return res.status(400).json({ error: 'Email already exists' });
     }
     res.status(500).json({ error: 'Registration failed', message: error.message });
@@ -43,15 +68,19 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const db = getPool();
+    let user;
+    if (DB_TYPE === 'mongodb') {
+      user = await User.findOne({ email }).lean();
+    } else {
+      const db = getPool();
+      const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+      user = users[0];
+    }
 
-    const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
-    
-    if (users.length === 0) {
+    if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const user = users[0];
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
@@ -59,7 +88,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id || user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: parseInt(process.env.JWT_EXPIRATION) }
     );
@@ -67,7 +96,7 @@ router.post('/login', async (req, res) => {
     res.json({
       token,
       user: {
-        id: user.id,
+        id: user.id || user._id,
         username: user.username,
         email: user.email,
         role: user.role

@@ -257,7 +257,7 @@ function DAssessments() {
             >
               <option value="">All Courses</option>
               {courses.map((course) => (
-                <option key={course.id} value={course.id}>
+                <option key={course.id || course._id} value={course.id || course._id}>
                   {course.title}
                 </option>
               ))}
@@ -301,7 +301,7 @@ function DAssessments() {
                   const status = assessment.passed ? 'PASSED' : 'FAILED';
                   const score = getScore(assessment);
                   return (
-                    <tr key={assessment.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={assessment.id || assessment._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div>
                           <p className="font-medium text-gray-900">{assessment.username || 'N/A'}</p>

@@ -28,8 +28,8 @@ function Courses() {
         if (userId && authToken) {
           const enrollmentsRes = await learningService.getEnrollments(userId);
           if (enrollmentsRes.success) {
-            // Map to course IDs - handle both 'id' and 'course_id' fields
-            const enrolledIds = enrollmentsRes.data.map((item) => item.course_id || item.id);
+            // Map to course IDs - handle both 'id', '_id' and 'course_id' fields, normalize to strings
+            const enrolledIds = enrollmentsRes.data.map((item) => String(item.course_id || item.id || item._id));
             setEnrolled(enrolledIds);
             console.log('Enrolled course IDs:', enrolledIds); // Debug log
           }
@@ -46,11 +46,12 @@ function Courses() {
 
   const filteredAndSortedCourses = useMemo(() => {
     let filtered = courses.filter(course => {
+      const courseId = course.id || course._id;
       const matchesSearch = (course.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (course.instructor || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      if (filterBy === "enrolled") return matchesSearch && enrolled.includes(course.id);
-      if (filterBy === "available") return matchesSearch && !enrolled.includes(course.id);
+      if (filterBy === "enrolled") return matchesSearch && enrolled.includes(courseId);
+      if (filterBy === "available") return matchesSearch && !enrolled.includes(courseId);
       return matchesSearch;
     });
 
@@ -81,8 +82,11 @@ function Courses() {
       return;
     }
 
+    // Normalize courseId to string for comparison
+    const normalizedCourseId = String(courseId);
+    
     // Check if already enrolled
-    if (enrolled.includes(courseId)) {
+    if (enrolled.some(id => String(id) === normalizedCourseId)) {
       message.warning("You are already enrolled in this course");
       return;
     }
@@ -93,7 +97,7 @@ function Courses() {
       // Refresh enrollments instead of full page reload
       const enrollmentsRes = await learningService.getEnrollments(userId);
       if (enrollmentsRes.success) {
-        const enrolledIds = enrollmentsRes.data.map((item) => item.course_id || item.id);
+        const enrolledIds = enrollmentsRes.data.map((item) => String(item.course_id || item.id || item._id));
         setEnrolled(enrolledIds);
       }
     } else {
@@ -185,11 +189,13 @@ function Courses() {
         ) : (
           <>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {displayedCourses.map((course) => (
+              {displayedCourses.map((course) => {
+                const courseId = course.id || course._id;
+                return (
                 <div
-                  key={course.id}
+                  key={courseId}
                   className="bg-white rounded-2xl shadow-lg border-0 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 overflow-hidden group backdrop-blur-sm cursor-pointer"
-                  onClick={() => handleCourseClick(course.id)}
+                  onClick={() => handleCourseClick(courseId)}
                 >
                   <div className="relative overflow-hidden">
                     <img 
@@ -214,7 +220,7 @@ function Courses() {
                       by {course.instructor || 'Unknown'}
                     </p>
 
-                    {authToken && enrolled.includes(course.id) ? (
+                    {authToken && enrolled.some(id => String(id) === String(courseId)) ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -228,7 +234,7 @@ function Courses() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          enrollCourse(course.id);
+                          enrollCourse(courseId);
                         }}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                       >
@@ -237,7 +243,8 @@ function Courses() {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
 
             {displayedCourses.length < filteredAndSortedCourses.length && (

@@ -150,7 +150,7 @@ function DCertificates() {
             >
               <option value="">All Courses</option>
               {courses.map((c) => (
-                <option key={c.id} value={c.id}>{c.title}</option>
+                <option key={c.id || c._id} value={c.id || c._id}>{c.title}</option>
               ))}
             </select>
           </div>
@@ -190,7 +190,7 @@ function DCertificates() {
             <tbody className="divide-y divide-gray-200">
               {certificates.length > 0 ? (
                 certificates.map((cert) => (
-                  <tr key={cert.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={cert.id || cert._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-medium text-gray-900">{cert.username}</p>

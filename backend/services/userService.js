@@ -1,7 +1,7 @@
 // User Service - Database operations for users
 
-const { getPool } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const { User, DB_TYPE } = require('../models');
 
 class UserService {
   /**
@@ -9,18 +9,22 @@ class UserService {
    */
   static async createUser(userData) {
     try {
-      const db = getPool();
-      const { username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role, isActive } = userData;
-      
+      const { password, ...rest } = userData;
       const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const [result] = await db.query(
-        `INSERT INTO user (username, email, password, mobileNumber, dob, gender, location, profession, linkedin_url, github_url, role, isActive) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [username, email, hashedPassword, mobileNumber || null, dob || null, gender || null, location || null, profession || null, linkedin_url || null, github_url || null, role || 'USER', isActive === undefined ? true : isActive]
-      );
-      
-      return { id: result.insertId, ...userData, password: hashedPassword };
+
+      if (DB_TYPE === 'mongodb') {
+        const u = new User({ ...rest, password: hashedPassword });
+        const saved = await u.save();
+        const obj = saved.toObject();
+        delete obj.password;
+        obj.id = obj._id;
+        return obj;
+      } else {
+        const user = await User.create({ ...rest, password: hashedPassword });
+        const data = user.toJSON();
+        delete data.password;
+        return data;
+      }
     } catch (error) {
       throw error;
     }
@@ -30,73 +34,84 @@ class UserService {
    * Get user by email
    */
   static async getUserByEmail(email) {
-    const db = getPool();
-    const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
-    return users.length > 0 ? users[0] : null;
+    if (DB_TYPE === 'mongodb') {
+      return await User.findOne({ email }).lean();
+    }
+    return await User.findOne({ where: { email } });
   }
 
   /**
    * Get user by ID
    */
   static async getUserById(id, includeSensitive = false) {
-    const db = getPool();
-    const [users] = await db.query('SELECT * FROM user WHERE id = ?', [id]);
-    
-    if (users.length === 0) return null;
-    
-    const user = users[0];
-    if (!includeSensitive) {
-      delete user.password;
+    if (DB_TYPE === 'mongodb') {
+      const query = { _id: id };
+      const projection = includeSensitive ? {} : { password: 0 };
+      const doc = await User.findOne(query, projection).lean();
+      if (doc) doc.id = doc._id;
+      return doc;
     }
-    return user;
+
+    const options = {};
+    if (!includeSensitive) {
+      options.attributes = { exclude: ['password'] };
+    }
+    return await User.findByPk(id, options);
   }
 
   /**
    * Get all users with pagination
    */
-  static async getAllUsers(limit, offset) {
-    const db = getPool();
-    const [total] = await db.query('SELECT COUNT(*) as count FROM user');
-    const [users] = await db.query(
-      `SELECT id, username, email, role, isActive, mobileNumber, gender, dob, profession, location, linkedin_url, github_url, profile_image, created_at
-       FROM user
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
-    
-    return {
-      users,
-      total: total[0].count
-    };
+  static async getAllUsers(limit = 10, offset = 0) {
+    if (DB_TYPE === 'mongodb') {
+      const query = {};
+      const total = await User.countDocuments(query);
+      const docs = await User.find(query, {
+        password: 0,
+        __v: 0,
+      })
+        .sort({ created_at: -1 })
+        .skip(offset)
+        .limit(limit)
+        .lean();
+      // map _id -> id
+      const users = docs.map(d => ({ ...d, id: d._id }));
+      return { users, total };
+    }
+
+    const { count, rows } = await User.findAndCountAll({
+      attributes: [
+        'id', 'username', 'email', 'role', 'isActive',
+        'mobileNumber', 'gender', 'dob', 'profession', 'location',
+        'linkedin_url', 'github_url', 'profile_image', 'created_at'
+      ],
+      order: [['created_at', 'DESC']],
+      limit,
+      offset
+    });
+
+    return { users: rows, total: count };
   }
 
   /**
    * Update user profile
    */
   static async updateProfile(userId, updates) {
-    const db = getPool();
-    const updateFields = [];
-    const values = [];
-    
-    // normal users may only modify personal info
-    const allowedFields = ['username', 'email', 'mobileNumber', 'gender', 'dob', 'profession', 'location', 'linkedin_url', 'github_url', 'profile_image'];
-    
+    const allowedFields = [
+      'username', 'email', 'mobileNumber', 'gender', 'dob',
+      'profession', 'location', 'linkedin_url', 'github_url', 'profile_image'
+    ];
+    const payload = {};
     for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        updateFields.push(`${field}=?`);
-        values.push(updates[field]);
-      }
+      if (updates[field] !== undefined) payload[field] = updates[field];
     }
-    
-    if (updateFields.length === 0) {
-      return false;
+    if (Object.keys(payload).length === 0) return false;
+
+    if (DB_TYPE === 'mongodb') {
+      await User.updateOne({ _id: userId }, { $set: payload });
+    } else {
+      await User.update(payload, { where: { id: userId } });
     }
-    
-    values.push(userId);
-    const query = `UPDATE user SET ${updateFields.join(', ')} WHERE id=?`;
-    await db.query(query, values);
-    
     return true;
   }
 
@@ -104,17 +119,17 @@ class UserService {
    * Change password
    */
   static async changePassword(userId, oldPassword, newPassword) {
-    const db = getPool();
     const user = await this.getUserById(userId, true);
-    
     if (!user) return false;
-    
     const isValid = await bcrypt.compare(oldPassword, user.password);
     if (!isValid) return false;
-    
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE user SET password=? WHERE id=?', [hashedPassword, userId]);
-    
+
+    if (DB_TYPE === 'mongodb') {
+      await User.updateOne({ _id: userId }, { password: hashedPassword });
+    } else {
+      await User.update({ password: hashedPassword }, { where: { id: userId } });
+    }
     return true;
   }
 
@@ -129,30 +144,65 @@ class UserService {
    * Get dashboard statistics
    */
   static async getDashboardStats() {
-    const db = getPool();
-    
-    const [userCountResult] = await db.query('SELECT COUNT(*) as count FROM user WHERE role = ?', ['USER']);
-    const [adminCountResult] = await db.query('SELECT COUNT(*) as count FROM user WHERE role = ?', ['ADMIN']);
-    const [courseCountResult] = await db.query('SELECT COUNT(*) as count FROM course');
-    const [enrollmentCountResult] = await db.query('SELECT COUNT(*) as count FROM learning WHERE status = ?', ['APPROVED']);
-    const [pendingCountResult] = await db.query('SELECT COUNT(*) as count FROM learning WHERE status = ?', ['PENDING']);
-    const [assessmentCountResult] = await db.query('SELECT COUNT(*) as count FROM assessment');
-    const [recentEnrollmentsResult] = await db.query(
-      'SELECT COUNT(*) as count FROM learning WHERE enrolled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)'
+    if (DB_TYPE === 'mongodb') {
+      // run counts using mongoose
+      const users = await User.countDocuments({ role: 'USER' });
+      const admins = await User.countDocuments({ role: 'ADMIN' });
+      // other collections still assumed to exist using mongoose models or raw queries
+      const courses = await require('./courseService').countAllMongo?.() || 0;
+      const enrollments = await require('./learningService').countByStatusMongo?.('APPROVED') || 0;
+      const pendingEnrollments = await require('./learningService').countByStatusMongo?.('PENDING') || 0;
+      const assessments = await require('./assessmentService').countAllMongo?.() || 0;
+      const recentEnrollments = await require('./learningService').countSinceMongo?.(7) || 0;
+      const completedCourses = await require('./progressService').countCompletedMongo?.() || 0;
+      return { users, admins, courses, enrollments, pendingEnrollments, assessments, recentEnrollments, completedCourses };
+    }
+
+    // you can still run raw SQL using sequelize.query while transitioning
+    const { sequelize } = require('../models');
+
+    const [userCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM user WHERE role = ?',
+      { replacements: ['USER'], type: sequelize.QueryTypes.SELECT }
     );
-    const [completionStatsResult] = await db.query(
-      'SELECT COUNT(*) as completed FROM progress WHERE completed = true'
+    const [adminCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM user WHERE role = ?',
+      { replacements: ['ADMIN'], type: sequelize.QueryTypes.SELECT }
     );
-    
+    const [courseCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM course',
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    const [enrollmentCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM learning WHERE status = ?',
+      { replacements: ['APPROVED'], type: sequelize.QueryTypes.SELECT }
+    );
+    const [pendingCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM learning WHERE status = ?',
+      { replacements: ['PENDING'], type: sequelize.QueryTypes.SELECT }
+    );
+    const [assessmentCount] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM assessment',
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    const [recentEnrollments] = await sequelize.query(
+      'SELECT COUNT(*) as count FROM learning WHERE enrolled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)',
+      { type: sequelize.QueryTypes.SELECT }
+    );
+    const [completionStats] = await sequelize.query(
+      'SELECT COUNT(*) as completed FROM progress WHERE completed = true',
+      { type: sequelize.QueryTypes.SELECT }
+    );
+
     return {
-      users: userCountResult[0].count,
-      admins: adminCountResult[0].count,
-      courses: courseCountResult[0].count,
-      enrollments: enrollmentCountResult[0].count,
-      pendingEnrollments: pendingCountResult[0].count,
-      assessments: assessmentCountResult[0].count,
-      recentEnrollments: recentEnrollmentsResult[0].count,
-      completedCourses: completionStatsResult[0].completed
+      users: userCount.count,
+      admins: adminCount.count,
+      courses: courseCount.count,
+      enrollments: enrollmentCount.count,
+      pendingEnrollments: pendingCount.count,
+      assessments: assessmentCount.count,
+      recentEnrollments: recentEnrollments.count,
+      completedCourses: completionStats.completed
     };
   }
 }

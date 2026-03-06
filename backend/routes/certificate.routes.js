@@ -5,6 +5,7 @@ const router = express.Router();
 const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const { HTTP_STATUS } = require('../utils/constants');
+const { DB_TYPE, Certificate } = require('../models');
 
 // Add certificate table setup (to be run during init)
 // CREATE TABLE IF NOT EXISTS certificate (
@@ -22,7 +23,26 @@ const { HTTP_STATUS } = require('../utils/constants');
 // Get user certificates
 router.get('/my-certificates', verifyToken, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const certificates = await Certificate.find({ user_id: req.userId, status: 'ISSUED' })
+        .populate('user_id', 'username email')
+        .populate('course_id', 'title')
+        .sort({ issued_at: -1 })
+        .lean();
+      const enhanced = certificates.map(c => {
+        if (!c.certificate_url) {
+          c.certificate_url = generateCertificateUrl(c.user_id._id, c.course_id._id, req);
+        }
+        return c;
+      });
+      return res.json(enhanced);
+    }
+    
     const db = getPool();
+    if (!db) {
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Database not initialized' });
+    }
+    
     const [certificates] = await db.query(
       `SELECT c.*, u.username, u.email, co.title as course_title
        FROM certificate c
@@ -32,7 +52,6 @@ router.get('/my-certificates', verifyToken, async (req, res) => {
        ORDER BY c.issued_at DESC`,
       [req.userId]
     );
-    // ensure certificate_url is usable even when the field was left blank
     const enhanced = certificates.map((c) => {
       if (!c.certificate_url) {
         c.certificate_url = generateCertificateUrl(c.user_id, c.course_id, req);
@@ -175,16 +194,67 @@ router.put('/:certificateId/revoke', verifyToken, isAdmin, async (req, res) => {
 // Get all certificates (Admin only) with search and filters
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = (page - 1) * limit;
+      const userId = req.query.userId;
+      const courseId = req.query.courseId;
+      const status = req.query.status;
+      const search = req.query.search;
+      
+      const filter = {};
+      if (userId) filter.user_id = userId;
+      if (courseId) filter.course_id = courseId;
+      if (status) filter.status = status;
+      if (search) {
+        filter.$or = [
+          { 'user_id.username': { $regex: search, $options: 'i' } },
+          { 'user_id.email': { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      const total = await Certificate.countDocuments(filter);
+      const certificates = await Certificate.find(filter)
+        .populate('user_id', 'username email')
+        .populate('course_id', 'title')
+        .sort({ issued_at: -1 })
+        .limit(limit)
+        .skip(offset)
+        .lean();
+        
+      const enhanced = certificates.map(c => ({
+        ...c,
+        id: c._id.toString(),
+        username: c.user_id?.username,
+        email: c.user_id?.email,
+        course_title: c.course_id?.title,
+        certificate_url: c.certificate_url || generateCertificateUrl(c.user_id._id, c.course_id._id, req)
+      }));
+      
+      return res.json({
+        certificates: enhanced,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalRecords: total
+        }
+      });
+    }
+    
     const db = getPool();
+    if (!db) {
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Database not initialized' });
+    }
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const userId = req.query.userId;
     const courseId = req.query.courseId;
     const status = req.query.status;
-    const search = req.query.search; // username or email
+    const search = req.query.search;
 
-    // build count query with filters
     let countSql = 'SELECT COUNT(*) as count FROM certificate c JOIN user u ON c.user_id = u.id WHERE 1=1';
     const countParams = [];
 
@@ -227,7 +297,6 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
 
     const [certificates] = await db.query(dataSql, dataParams);
 
-    // populate missing urls
     const enhanced = certificates.map((c) => {
       if (!c.certificate_url) {
         c.certificate_url = generateCertificateUrl(c.user_id, c.course_id, req);
@@ -262,12 +331,40 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
     const { userId, courseId, certificateUrl, status } = req.body;
+    
+    console.log('Creating certificate with data:', { userId, courseId, certificateUrl, status });
+    
     if (!userId || !courseId) {
       return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId and courseId are required' });
     }
+    
+    const certStatus = status || 'ISSUED';
+    
+    if (DB_TYPE === 'mongodb') {
+      const mongoose = require('mongoose');
+      
+      // Validate ObjectIds
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: 'Invalid user ID format' });
+      }
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+        return res.status(400).json({ message: 'Invalid course ID format' });
+      }
+      
+      // Mongoose will automatically convert string IDs to ObjectIds
+      const url = certificateUrl || generateCertificateUrl(userId, courseId, req);
+      const certificate = new Certificate({
+        user_id: userId,
+        course_id: courseId,
+        certificate_url: url,
+        status: certStatus
+      });
+      await certificate.save();
+      return res.status(201).json({ message: 'Certificate created', certificateId: certificate._id });
+    }
+    
     const db = getPool();
     const url = certificateUrl || generateCertificateUrl(userId, courseId, req);
-    const certStatus = status || 'ISSUED';
     const [result] = await db.query(
       'INSERT INTO certificate (user_id, course_id, certificate_url, status) VALUES (?, ?, ?, ?)',
       [userId, courseId, url, certStatus]
@@ -275,7 +372,8 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
     res.status(201).json({ message: 'Certificate created', certificateId: result.insertId });
   } catch (error) {
     console.error('Error creating certificate:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create certificate' });
+    console.error('Error stack:', error.stack);
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create certificate', message: error.message });
   }
 });
 
@@ -283,6 +381,23 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 router.put('/:certificateId', verifyToken, isAdmin, async (req, res) => {
   try {
     const { certificateUrl, status } = req.body;
+    
+    if (DB_TYPE === 'mongodb') {
+      const updates = {};
+      if (certificateUrl) updates.certificate_url = certificateUrl;
+      if (status) updates.status = status;
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Nothing to update' });
+      }
+      
+      const certificate = await Certificate.findByIdAndUpdate(req.params.certificateId, updates, { new: true });
+      if (!certificate) {
+        return res.status(404).json({ error: 'Certificate not found' });
+      }
+      return res.json({ message: 'Certificate updated' });
+    }
+    
     const fields = [];
     const params = [];
     if (certificateUrl) {
@@ -301,18 +416,26 @@ router.put('/:certificateId', verifyToken, isAdmin, async (req, res) => {
     res.json({ message: 'Certificate updated' });
   } catch (error) {
     console.error('Error updating certificate:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to update certificate' });
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to update certificate', message: error.message });
   }
 });
 
 // Delete certificate (admin)
 router.delete('/:certificateId', verifyToken, isAdmin, async (req, res) => {
   try {
+    if (DB_TYPE === 'mongodb') {
+      const certificate = await Certificate.findByIdAndDelete(req.params.certificateId);
+      if (!certificate) {
+        return res.status(404).json({ error: 'Certificate not found' });
+      }
+      return res.json({ message: 'Certificate deleted' });
+    }
+    
     await getPool().query('DELETE FROM certificate WHERE id = ?', [req.params.certificateId]);
     res.json({ message: 'Certificate deleted' });
   } catch (error) {
     console.error('Error deleting certificate:', error);
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to delete certificate' });
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to delete certificate', message: error.message });
   }
 });
 

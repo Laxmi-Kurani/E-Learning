@@ -184,12 +184,17 @@ function CourseModal({ isOpen, onClose, onSuccess, courseId = null, mode = "add"
               name="category"
               rules={[{ required: true, message: "Category is required" }]}
             >
-            <select className="w-full border rounded px-2 py-1">
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </select>
+              <select className="w-full border rounded px-2 py-1">
+                <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.id || c._id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </Form.Item>
+
+            <Form.Item
+              label="Price"
+              name="price"
               rules={[
                 { required: true, message: "Price is required" },
                 { type: "number", min: 0, message: "Price must be a positive number" },
