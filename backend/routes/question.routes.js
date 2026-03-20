@@ -5,84 +5,38 @@ const { verifyToken, isAdmin } = require('../middleware/auth');
 const { validateQuestion } = require('../middleware/validation');
 const { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } = require('../utils/constants');
 const { getPaginationParams, handleDatabaseError } = require('../utils/helpers');
-const { DB_TYPE, Question, Course } = require('../models');
 
 // Get all questions (Admin only) - with pagination, search, filter
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
-    if (DB_TYPE === 'mongodb') {
-      const { limit, offset } = getPaginationParams(req.query);
-      const search = req.query.search || '';
-      const courseId = req.query.courseId;
-      
-      const filter = {};
-      if (search) {
-        filter.question_text = { $regex: search, $options: 'i' };
-      }
-      if (courseId) {
-        filter.course_id = courseId;
-      }
-      
-      const total = await Question.countDocuments(filter);
-      const questions = await Question.find(filter)
-        .sort({ created_at: -1 })
-        .limit(limit)
-        .skip(offset)
-        .lean();
-        
-      return res.json({
-        data: questions,
-        pagination: {
-          currentPage: Math.floor(offset / limit) + 1,
-          limit,
-          totalRecords: total,
-          totalPages: Math.ceil(total / limit),
-          hasNextPage: offset + limit < total,
-          hasPrevPage: offset > 0
-        }
-      });
-    }
-    
     const db = getPool();
-    if (!db) {
-      return res.status(500).json({ message: 'Database not initialized' });
-    }
-    
+    if (!db) return res.status(500).json({ message: 'Database not initialized' });
+
     const { limit, offset } = getPaginationParams(req.query);
     const search = req.query.search || '';
     const courseId = req.query.courseId;
-    
+
     let query = 'SELECT COUNT(*) as count FROM question WHERE 1=1';
     let countParams = [];
-    
-    let dataQuery = `SELECT id, course_id, question_text, 
-                    option_a, option_b, option_c, option_d, correct_answer, created_at
-                    FROM question WHERE 1=1`;
+    let dataQuery = `SELECT id, course_id, question_text, option_a, option_b, option_c, option_d, correct_answer, created_at FROM question WHERE 1=1`;
     let dataParams = [];
-    
+
     if (search) {
-      query += ' AND question_text LIKE ?';
-      dataQuery += ' AND question_text LIKE ?';
-      const searchTerm = `%${search}%`;
-      countParams.push(searchTerm);
-      dataParams.push(searchTerm);
+      query += ' AND question_text LIKE ?'; dataQuery += ' AND question_text LIKE ?';
+      countParams.push(`%${search}%`); dataParams.push(`%${search}%`);
     }
-    
     if (courseId && !isNaN(courseId)) {
-      query += ' AND course_id = ?';
-      dataQuery += ' AND course_id = ?';
-      countParams.push(courseId);
-      dataParams.push(courseId);
+      query += ' AND course_id = ?'; dataQuery += ' AND course_id = ?';
+      countParams.push(courseId); dataParams.push(courseId);
     }
-    
+
     const [countResult] = await db.query(query, countParams);
     const total = countResult[0].count;
-    
+
     dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     dataParams.push(limit, offset);
-    
     const [questions] = await db.query(dataQuery, dataParams);
-    
+
     res.json({
       data: questions,
       pagination: {
