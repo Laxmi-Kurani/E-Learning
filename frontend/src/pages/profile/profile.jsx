@@ -22,6 +22,7 @@ import {
   faTrophy
 } from "@fortawesome/free-solid-svg-icons";
 import { profileService } from "../../api/profile.service";
+import { API_BASE_URL } from "../../api/constant";
 import EditProfileModal from "./EditProfileModal";
 
 function Profile() {
@@ -29,30 +30,70 @@ function Profile() {
   const [userDetails, setUserDetails] = useState(null);
   const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || "");
   const [loadingImage, setLoadingImage] = useState(true);
+  const [pendingFile, setPendingFile] = useState(null);   // file selected but not yet saved
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const toAbsoluteImageUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('data:image/') || path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
+      return path;
+    }
+    if (path.startsWith('/')) {
+      return `${API_BASE_URL}${path}`;
+    }
+    return `${API_BASE_URL}/${path}`;
+  };
+
   useEffect(() => {
     async function fetchUserDetails() {
       try {
         setLoading(true);
+        setLoadingImage(true);
         const userRes = await profileService.getUserDetails(id);
         if (userRes.success) {
           setUserDetails(userRes.data);
-          // Set profile image from user data if available
-          if (userRes.data.profile_image) {
-            setProfileImage(userRes.data.profile_image);
+
+          // Normalize profile image path for rendering
+          let profileImg = userRes.data.profile_image;
+          console.log('Profile image from API:', profileImg);
+          
+          if (profileImg && profileImg.trim()) {
+            const normalizedImg = profileImg.startsWith('data:image/')
+              ? profileImg
+              : toAbsoluteImageUrl(profileImg);
+            console.log('Normalized image URL:', normalizedImg);
+            setProfileImage(normalizedImg);
+            localStorage.setItem("profileImage", normalizedImg);
+            setLoadingImage(false);
+          } else {
+            console.log('No profile image in user data, trying fallback endpoint...');
+            // Fallback: use /api/users/:id/profile-image endpoint if available
+            try {
+              const imgRes = await profileService.getProfileImage(id);
+              if (imgRes.success && imgRes.data) {
+                console.log('Fallback image loaded:', imgRes.data);
+                setProfileImage(imgRes.data);
+                localStorage.setItem("profileImage", imgRes.data);
+              }
+              setLoadingImage(false);
+            } catch (lookupErr) {
+              console.warn('Profile image fallback failed', lookupErr);
+              setLoadingImage(false);
+            }
           }
         } else {
           setError("Failed to load user details");
+          setLoadingImage(false);
         }
       } catch (err) {
         console.error("Error fetching user details:", err);
         setError("Failed to load profile");
-      } finally {
         setLoadingImage(false);
+      } finally {
         setLoading(false);
       }
     }
@@ -88,38 +129,78 @@ function Profile() {
     return success;
   };
 
-  const handleImageChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
+  // Step 1 – user picks a file → show preview + Save/Cancel buttons
+  const handleFileSelect = (file) => {
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
     }
-
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
+    if (file.size > 7 * 1024 * 1024) {
+      alert('Image size must be less than 7MB');
       return;
     }
+    setPendingFile(file);
+  };
 
-    setLoadingImage(true);
-    const res = await profileService.uploadProfileImage(id, file);
-    if (res.success) {
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file);
-      setProfileImage(previewUrl);
-      
-      // Refresh user details to get the saved image
-      const userRes = await profileService.getUserDetails(id);
-      if (userRes.success && userRes.data.profile_image) {
-        setProfileImage(userRes.data.profile_image);
-      }
-    } else {
-      alert('Failed to upload image. Please try again.');
+  // Step 2 – user clicks "Save Photo" → upload to API
+  const handleSavePhoto = async () => {
+    if (!pendingFile) {
+      alert('Please select a photo first');
+      return;
     }
-    setLoadingImage(false);
+    
+    setIsSaving(true);
+    setLoadingImage(true);
+    console.log('Starting photo upload for file:', pendingFile.name);
+
+    try {
+      const res = await profileService.uploadProfileImage(id, pendingFile);
+      console.log('Upload response:', res);
+      
+      if (!res.success) {
+        console.error('Upload failed', res.error);
+        alert('Failed to upload image. Please try again.');
+        return;
+      }
+
+      // refresh user after saved image
+      console.log('Refetching user details after successful upload...');
+      const userRes = await profileService.getUserDetails(id);
+      console.log('User details response:', userRes);
+      
+      if (userRes.success && userRes.data) {
+        setUserDetails(userRes.data);
+        
+        const newImageRaw = userRes.data.profile_image;
+        console.log('New profile_image from API:', newImageRaw);
+        
+        if (newImageRaw && newImageRaw.trim()) {
+          const newImage = newImageRaw.startsWith('data:image/')
+            ? newImageRaw
+            : toAbsoluteImageUrl(newImageRaw);
+          console.log('Normalized new image URL:', newImage);
+          setProfileImage(newImage);
+          localStorage.setItem('profileImage', newImage);
+          alert('Photo saved successfully!');
+        } else {
+          console.warn('profile_image is empty or null after upload');
+        }
+      }
+      
+      setPendingFile(null);
+    } catch (err) {
+      console.error('Error saving profile image:', err);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsSaving(false);
+      setLoadingImage(false);
+      console.log('Photo save process completed');
+    }
+  };
+
+  // Cancel – discard the pending selection
+  const handleCancelPhoto = () => {
+    setPendingFile(null);
   };
 
   const getGenderIcon = (gender) => {
@@ -183,9 +264,13 @@ function Profile() {
             <div className="flex flex-col sm:flex-row items-start sm:items-end mb-6">
               <div className="relative z-10">
                 <ImgUpload
-                  onChange={handleImageChange}
                   src={loadingImage ? null : profileImage}
                   isLoading={loadingImage}
+                  pendingFile={pendingFile}
+                  onFileSelect={handleFileSelect}
+                  onSave={handleSavePhoto}
+                  onCancel={handleCancelPhoto}
+                  isSaving={isSaving}
                 />
               </div>
 
