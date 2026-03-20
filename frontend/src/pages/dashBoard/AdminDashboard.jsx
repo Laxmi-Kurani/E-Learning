@@ -58,10 +58,10 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-100">
       <SideBar current={current} onSelect={setCurrent} />
-      <section className="flex-1 bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-100 transition-all duration-300">
-        <main className="p-8 font-poppins">{renderContent()}</main>
+      <section className="flex-1 transition-all duration-300">
+        <main className="p-8 font-poppins min-h-screen">{renderContent()}</main>
       </section>
 
       {!isAuthenticated && (

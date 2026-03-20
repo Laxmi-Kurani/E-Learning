@@ -3,85 +3,19 @@ const router = express.Router();
 const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const { getPaginationParams } = require('../utils/helpers');
-const { DB_TYPE, Assessment } = require('../models');
 
 // Get all assessments (Admin only) - with pagination, search and filters
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { limit, offset, page } = getPaginationParams(req.query);
     const courseId = req.query.courseId;
     const status = req.query.status;
     const userId = req.query.userId;
-    const search = req.query.search; // search by username or email
+    const search = req.query.search;
 
-    if (DB_TYPE === 'mongodb') {
-      // Build aggregation pipeline for Mongo
-      const pipeline = [];
-      const mongoose = require('mongoose');
-
-      if (courseId && mongoose.Types.ObjectId.isValid(courseId)) {
-        pipeline.push({ $match: { course_id: mongoose.Types.ObjectId(courseId) } });
-      }
-      if (status === 'PASSED') {
-        pipeline.push({ $match: { passed: true } });
-      } else if (status === 'FAILED') {
-        pipeline.push({ $match: { passed: false } });
-      }
-      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-        pipeline.push({ $match: { user_id: mongoose.Types.ObjectId(userId) } });
-      }
-      if (search) {
-        const regex = new RegExp(search, 'i');
-        pipeline.push(
-          { $lookup: { from: 'user', localField: 'user_id', foreignField: '_id', as: 'user' } },
-          { $unwind: '$user' },
-          { $match: { $or: [{ 'user.username': regex }, { 'user.email': regex }] } }
-        );
-      }
-
-      // count total documents matching filters
-      const countPipeline = [...pipeline, { $count: 'count' }];
-      const countResult = await Assessment.aggregate(countPipeline).exec();
-      const total = countResult[0]?.count || 0;
-
-      // add sorting, pagination, and lookups for user/course metadata
-      pipeline.push(
-        { $sort: { completed_at: -1 } },
-        { $skip: offset },
-        { $limit: limit },
-        { $lookup: { from: 'user', localField: 'user_id', foreignField: '_id', as: 'user' } },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-        { $lookup: { from: 'course', localField: 'course_id', foreignField: '_id', as: 'course' } },
-        { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } }
-      );
-
-      const docs = await Assessment.aggregate(pipeline).exec();
-      const assessments = docs.map(doc => ({
-        ...doc,
-        id: doc._id.toString(),
-        username: doc.user?.username,
-        email: doc.user?.email,
-        course_title: doc.course?.title
-      }));
-
-      return res.json({
-        assessments,
-        pagination: {
-          currentPage: page,
-          limit,
-          totalRecords: total,
-          totalPages: Math.ceil(total / limit),
-          hasNextPage: offset + limit < total,
-          hasPrevPage: offset > 0
-        }
-      });
-    }
-
-    const db = getPool();
-    // SQL branch remains unchanged
     let query = 'SELECT COUNT(*) as count FROM assessment a JOIN user u ON a.user_id = u.id WHERE 1=1';
     let countParams = [];
-
     let dataQuery = `SELECT a.*, u.username, u.email, c.title as course_title
                     FROM assessment a
                     JOIN user u ON a.user_id = u.id
@@ -89,54 +23,37 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
                     WHERE 1=1`;
     let dataParams = [];
 
-    // Apply course filter
     if (courseId && !isNaN(courseId)) {
-      query += ' AND a.course_id = ?';
-      dataQuery += ' AND a.course_id = ?';
-      countParams.push(courseId);
-      dataParams.push(courseId);
+      query += ' AND a.course_id = ?'; dataQuery += ' AND a.course_id = ?';
+      countParams.push(courseId); dataParams.push(courseId);
     }
-
-    // Apply status filter
     if (status === 'PASSED') {
-      query += ' AND a.passed = true';
-      dataQuery += ' AND a.passed = true';
+      query += ' AND a.passed = true'; dataQuery += ' AND a.passed = true';
     } else if (status === 'FAILED') {
-      query += ' AND a.passed = false';
-      dataQuery += ' AND a.passed = false';
+      query += ' AND a.passed = false'; dataQuery += ' AND a.passed = false';
     }
-
-    // Apply userId filter
     if (userId && !isNaN(userId)) {
-      query += ' AND a.user_id = ?';
-      dataQuery += ' AND a.user_id = ?';
-      countParams.push(userId);
-      dataParams.push(userId);
+      query += ' AND a.user_id = ?'; dataQuery += ' AND a.user_id = ?';
+      countParams.push(userId); dataParams.push(userId);
     }
-
-    // Apply search on username/email
     if (search) {
       query += ' AND (u.username LIKE ? OR u.email LIKE ?)';
       dataQuery += ' AND (u.username LIKE ? OR u.email LIKE ?)';
       const term = `%${search}%`;
-      countParams.push(term, term);
-      dataParams.push(term, term);
+      countParams.push(term, term); dataParams.push(term, term);
     }
 
-    // Get total count
     const [countResult] = await db.query(query, countParams);
     const total = countResult[0].count;
 
-    // Get paginated data
     dataQuery += ' ORDER BY a.completed_at DESC LIMIT ? OFFSET ?';
     dataParams.push(limit, offset);
-
     const [assessments] = await db.query(dataQuery, dataParams);
 
     res.json({
       assessments,
       pagination: {
-        currentPage: Math.floor(offset / limit) + 1,
+        currentPage: page,
         limit,
         totalRecords: total,
         totalPages: Math.ceil(total / limit),
@@ -183,6 +100,7 @@ router.post('/submit', verifyToken, async (req, res) => {
 // Submit assessment - frontend compatibility endpoint
 router.post('/add/:userId/:courseId', verifyToken, async (req, res) => {
   try {
+    const db = getPool();
     const { marks } = req.body;
     const { userId, courseId } = req.params;
     
@@ -305,23 +223,6 @@ router.get('/performance/:userId', verifyToken, async (req, res) => {
 // Get a single assessment by id
 router.get('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
-    if (DB_TYPE === 'mongodb') {
-      const assessment = await Assessment.findById(req.params.id)
-        .populate('user_id', 'username email')
-        .populate('course_id', 'title')
-        .lean();
-      if (!assessment) {
-        return res.status(404).json({ message: 'Assessment not found' });
-      }
-      return res.json({
-        ...assessment,
-        id: assessment._id.toString(),
-        username: assessment.user_id?.username,
-        email: assessment.user_id?.email,
-        course_title: assessment.course_id?.title
-      });
-    }
-    
     const db = getPool();
     const [rows] = await db.query(
       `SELECT a.*, u.username, u.email, c.title as course_title
@@ -331,12 +232,9 @@ router.get('/:id', verifyToken, isAdmin, async (req, res) => {
        WHERE a.id = ?`,
       [req.params.id]
     );
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Assessment not found' });
-    }
+    if (rows.length === 0) return res.status(404).json({ message: 'Assessment not found' });
     res.json(rows[0]);
   } catch (error) {
-    console.error('Error fetching assessment by id:', error);
     res.status(500).json({ message: 'Error fetching assessment', error: error.message });
   }
 });
@@ -344,48 +242,18 @@ router.get('/:id', verifyToken, isAdmin, async (req, res) => {
 // Create a new assessment (admin)
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const db = getPool();
     const { userId, courseId, score, totalQuestions, passed } = req.body;
-    
-    console.log('Creating assessment with data:', { userId, courseId, score, totalQuestions, passed });
-    
     if (!userId || !courseId || score == null || totalQuestions == null) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
-    
     const passFlag = passed == null ? (score / totalQuestions) >= 0.7 : passed;
-    
-    if (DB_TYPE === 'mongodb') {
-      const mongoose = require('mongoose');
-      
-      // Validate and convert ObjectIds
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID format' });
-      }
-      if (!mongoose.Types.ObjectId.isValid(courseId)) {
-        return res.status(400).json({ message: 'Invalid course ID format' });
-      }
-      
-      // Mongoose will automatically convert string IDs to ObjectIds
-      const assessment = new Assessment({
-        user_id: userId,
-        course_id: courseId,
-        score: parseInt(score),
-        total_questions: parseInt(totalQuestions),
-        passed: passFlag
-      });
-      await assessment.save();
-      return res.status(201).json({ message: 'Assessment created', assessmentId: assessment._id });
-    }
-    
-    const db = getPool();
     const [result] = await db.query(
       'INSERT INTO assessment (user_id, course_id, score, total_questions, passed) VALUES (?, ?, ?, ?, ?)',
       [userId, courseId, score, totalQuestions, passFlag]
     );
     res.status(201).json({ message: 'Assessment created', assessmentId: result.insertId });
   } catch (error) {
-    console.error('Error creating assessment:', error);
-    console.error('Error stack:', error.stack);
     res.status(500).json({ message: 'Error creating assessment', error: error.message });
   }
 });
@@ -393,49 +261,18 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 // Update an assessment (admin)
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
-    const { score, totalQuestions, passed } = req.body;
-    
-    if (DB_TYPE === 'mongodb') {
-      const updates = {};
-      if (score != null) updates.score = score;
-      if (totalQuestions != null) updates.total_questions = totalQuestions;
-      if (passed != null) updates.passed = passed;
-      
-      if (Object.keys(updates).length === 0) {
-        return res.status(400).json({ message: 'No fields to update' });
-      }
-      
-      const assessment = await Assessment.findByIdAndUpdate(req.params.id, updates, { new: true });
-      if (!assessment) {
-        return res.status(404).json({ message: 'Assessment not found' });
-      }
-      return res.json({ message: 'Assessment updated' });
-    }
-    
     const db = getPool();
+    const { score, totalQuestions, passed } = req.body;
     const fields = [];
     const params = [];
-    if (score != null) {
-      fields.push('score = ?');
-      params.push(score);
-    }
-    if (totalQuestions != null) {
-      fields.push('total_questions = ?');
-      params.push(totalQuestions);
-    }
-    if (passed != null) {
-      fields.push('passed = ?');
-      params.push(passed);
-    }
-    if (fields.length === 0) {
-      return res.status(400).json({ message: 'No fields to update' });
-    }
+    if (score != null) { fields.push('score = ?'); params.push(score); }
+    if (totalQuestions != null) { fields.push('total_questions = ?'); params.push(totalQuestions); }
+    if (passed != null) { fields.push('passed = ?'); params.push(passed); }
+    if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
     params.push(req.params.id);
-    const sql = `UPDATE assessment SET ${fields.join(', ')} WHERE id = ?`;
-    await db.query(sql, params);
+    await db.query(`UPDATE assessment SET ${fields.join(', ')} WHERE id = ?`, params);
     res.json({ message: 'Assessment updated' });
   } catch (error) {
-    console.error('Error updating assessment:', error);
     res.status(500).json({ message: 'Error updating assessment', error: error.message });
   }
 });
@@ -443,19 +280,10 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 // Delete an assessment (admin)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
-    if (DB_TYPE === 'mongodb') {
-      const assessment = await Assessment.findByIdAndDelete(req.params.id);
-      if (!assessment) {
-        return res.status(404).json({ message: 'Assessment not found' });
-      }
-      return res.json({ message: 'Assessment deleted' });
-    }
-    
     const db = getPool();
     await db.query('DELETE FROM assessment WHERE id = ?', [req.params.id]);
     res.json({ message: 'Assessment deleted' });
   } catch (error) {
-    console.error('Error deleting assessment:', error);
     res.status(500).json({ message: 'Error deleting assessment', error: error.message });
   }
 });

@@ -1,29 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { Category, DB_TYPE } = require('../models');
-const { Op } = require('sequelize');
+const { getPool } = require('../config/database');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // List categories (optional search)
 router.get('/', async (req, res) => {
   try {
     const { search } = req.query;
-    if (DB_TYPE === 'mongodb') {
-      const query = {};
-      if (search) {
-        query.name = { $regex: search, $options: 'i' };
-      }
-      const cats = await Category.find(query).sort({ name: 1 }).lean();
-      res.json(cats);
-    } else {
-      const where = {};
-      if (search) {
-        where.name = { [Op.like]: `%${search}%` };
-      }
-      const categories = await Category.findAll({ where, order: [['name', 'ASC']] });
-      res.json(categories);
+    const db = getPool();
+    
+    let query = 'SELECT * FROM category';
+    let params = [];
+    
+    if (search) {
+      query += ' WHERE name LIKE ?';
+      params.push(`%${search}%`);
     }
+    
+    query += ' ORDER BY name ASC';
+    
+    const [categories] = await db.query(query, params);
+    res.json(categories);
   } catch (error) {
+    console.error('Error fetching categories:', error);
     res.status(500).json({ message: 'Error fetching categories', error: error.message });
   }
 });
@@ -37,22 +36,18 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Category name is required' });
     }
 
-    if (DB_TYPE === 'mongodb') {
-      const existing = await Category.findOne({ name });
-      if (existing) {
-        return res.status(400).json({ message: 'Category already exists' });
-      }
-      const cat = new Category({ name });
-      await cat.save();
-      res.status(201).json({ message: 'Category created successfully', categoryId: cat._id });
-    } else {
-      const [category, created] = await Category.findOrCreate({ where: { name } });
-      if (!created) {
-        return res.status(400).json({ message: 'Category already exists' });
-      }
-      res.status(201).json({ message: 'Category created successfully', categoryId: category.id });
+    const db = getPool();
+    
+    // Check if category already exists
+    const [existing] = await db.query('SELECT * FROM category WHERE name = ?', [name]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Category already exists' });
     }
+    
+    const [result] = await db.query('INSERT INTO category (name) VALUES (?)', [name]);
+    res.status(201).json({ message: 'Category created successfully', categoryId: result.insertId });
   } catch (error) {
+    console.error('Error creating category:', error);
     res.status(500).json({ message: 'Error creating category', error: error.message });
   }
 });
@@ -66,13 +61,11 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Category name is required' });
     }
 
-    if (DB_TYPE === 'mongodb') {
-      await Category.updateOne({ _id: req.params.id }, { name });
-    } else {
-      await Category.update({ name }, { where: { id: req.params.id } });
-    }
+    const db = getPool();
+    await db.query('UPDATE category SET name = ? WHERE id = ?', [name, req.params.id]);
     res.json({ message: 'Category updated successfully' });
   } catch (error) {
+    console.error('Error updating category:', error);
     res.status(500).json({ message: 'Error updating category', error: error.message });
   }
 });
@@ -80,13 +73,11 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 // Delete category (admin only)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
-    if (DB_TYPE === 'mongodb') {
-      await Category.deleteOne({ _id: req.params.id });
-    } else {
-      await Category.destroy({ where: { id: req.params.id } });
-    }
+    const db = getPool();
+    await db.query('DELETE FROM category WHERE id = ?', [req.params.id]);
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {
+    console.error('Error deleting category:', error);
     res.status(500).json({ message: 'Error deleting category', error: error.message });
   }
 });
