@@ -228,24 +228,6 @@ router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
   }
 });
 
-// Get user by ID
-router.get('/:id', verifyToken, async (req, res) => {
-  try {
-    const user = await userService.getUserById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const safeUser = user.toJSON ? user.toJSON() : { ...user };
-    delete safeUser.password;
-    safeUser.profile_image = normalizeProfileImage(safeUser.profile_image, req);
-    res.json(safeUser);
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ message: 'Error fetching user', error: error.message, code: error.code });
-  }
-});
-
 // Get profile image (must come before /:id route)
 router.get('/:id/profile-image', verifyToken, async (req, res) => {
   try {
@@ -293,6 +275,24 @@ router.get('/:id/profile-image', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Profile image fetch error:', error);
     res.status(500).json({ message: 'Error fetching profile image', error: error.message, code: error.code });
+  }
+});
+
+// Get user by ID
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const user = await userService.getUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const safeUser = user.toJSON ? user.toJSON() : { ...user };
+    delete safeUser.password;
+    safeUser.profile_image = normalizeProfileImage(safeUser.profile_image, req);
+    res.json(safeUser);
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ message: 'Error fetching user', error: error.message, code: error.code });
   }
 });
 

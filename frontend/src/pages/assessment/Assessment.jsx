@@ -240,12 +240,21 @@ function Assessment() {
         onCancel={() => setOpenModal(false)}
         footer={[
           <button
-            key="ok"
+            key="course"
             onClick={() => navigate(`/course/${courseId}`)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors mr-2"
           >
             Continue Learning
-          </button>
+          </button>,
+          totalQsns > 0 && (correctCount / totalQsns) >= 0.7 && (
+            <button
+              key="certificate"
+              onClick={() => navigate(`/certificate/${courseId}`)}
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              View Certificate
+            </button>
+          )
         ]}
         className="assessment-modal"
         width={500}

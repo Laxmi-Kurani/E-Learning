@@ -97,8 +97,9 @@ const validateCourse = (req, res, next) => {
  */
 const validateQuestion = (req, res, next) => {
   const { courseId, questionText, optionA, optionB, optionC, optionD, correctAnswer } = req.body;
-  
-  if (!courseId || isNaN(courseId)) {
+
+  // courseId is required only on POST (create), not PUT (update)
+  if (req.method === 'POST' && (!courseId || isNaN(courseId))) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
       error: 'Valid course ID is required' 
     });

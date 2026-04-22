@@ -212,7 +212,7 @@ function Courses() {
                               <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                                 <span className="text-sm text-gray-600">Price:</span>
-                                <span className="text-lg font-bold text-green-600">${course.price}</span>
+                                <span className="text-lg font-bold text-green-600">₹{course.price}</span>
                               </div>
                             )}
                           <div className="flex items-center gap-2">

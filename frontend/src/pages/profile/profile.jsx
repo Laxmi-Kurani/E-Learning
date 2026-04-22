@@ -103,12 +103,16 @@ function Profile() {
   const updateUser = async (updatedData) => {
     try {
       const res = await profileService.updateUser(id, updatedData);
+      if (!res.success) return false;
 
-      setUserDetails(prevDetails => ({
-        ...prevDetails,
-        ...updatedData
-      }));
-
+      // Refresh from server so UI reflects saved values
+      const userRes = await profileService.getUserDetails(id);
+      if (userRes.success) {
+        setUserDetails(userRes.data);
+      } else {
+        // Optimistic fallback
+        setUserDetails(prev => ({ ...prev, ...updatedData }));
+      }
       return true;
     } catch (err) {
       console.error("Error updating user:", err);
@@ -144,57 +148,40 @@ function Profile() {
 
   // Step 2 – user clicks "Save Photo" → upload to API
   const handleSavePhoto = async () => {
-    if (!pendingFile) {
-      alert('Please select a photo first');
-      return;
-    }
-    
+    if (!pendingFile) return;
+
     setIsSaving(true);
-    setLoadingImage(true);
-    console.log('Starting photo upload for file:', pendingFile.name);
 
     try {
       const res = await profileService.uploadProfileImage(id, pendingFile);
-      console.log('Upload response:', res);
-      
+
       if (!res.success) {
-        console.error('Upload failed', res.error);
-        alert('Failed to upload image. Please try again.');
+        alert(res.error || 'Failed to upload image. Please try again.');
         return;
       }
 
-      // refresh user after saved image
-      console.log('Refetching user details after successful upload...');
-      const userRes = await profileService.getUserDetails(id);
-      console.log('User details response:', userRes);
-      
-      if (userRes.success && userRes.data) {
-        setUserDetails(userRes.data);
-        
-        const newImageRaw = userRes.data.profile_image;
-        console.log('New profile_image from API:', newImageRaw);
-        
-        if (newImageRaw && newImageRaw.trim()) {
-          const newImage = newImageRaw.startsWith('data:image/')
-            ? newImageRaw
-            : toAbsoluteImageUrl(newImageRaw);
-          console.log('Normalized new image URL:', newImage);
-          setProfileImage(newImage);
-          localStorage.setItem('profileImage', newImage);
-          alert('Photo saved successfully!');
-        } else {
-          console.warn('profile_image is empty or null after upload');
+      // Use the base64 returned directly from the upload response — no need to re-fetch
+      const savedImage = res.data?.profile_image;
+      if (savedImage) {
+        setProfileImage(savedImage);
+        try { localStorage.setItem('profileImage', savedImage); } catch (_) { /* quota exceeded — skip */ }
+      } else {
+        // Fallback: re-fetch profile
+        const userRes = await profileService.getUserDetails(id);
+        if (userRes.success && userRes.data?.profile_image) {
+          const img = toAbsoluteImageUrl(userRes.data.profile_image);
+          setProfileImage(img);
+          try { localStorage.setItem('profileImage', img); } catch (_) {}
+          setUserDetails(userRes.data);
         }
       }
-      
+
       setPendingFile(null);
     } catch (err) {
       console.error('Error saving profile image:', err);
       alert('Failed to upload image. Please try again.');
     } finally {
       setIsSaving(false);
-      setLoadingImage(false);
-      console.log('Photo save process completed');
     }
   };
 

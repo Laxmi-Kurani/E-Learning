@@ -6,73 +6,48 @@ import api from "../../api/api";
 
 const { Option } = Select;
 
-function CertificateModal({ isOpen, onClose, onSuccess, certificateId = null, mode = "add" }) {
+function CertificateModal({ isOpen, onClose, onSuccess, certificateId = null, certificateData = null, mode = "add" }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [fetchingData, setFetchingData] = useState(false);
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [dataReady, setDataReady] = useState(false);
 
   const isEditMode = mode === "edit" || certificateId !== null;
-  const modalTitle = isEditMode ? "Edit Certificate" : "Add New Certificate";
-  const submitButtonText = isEditMode ? "Update Certificate" : "Add Certificate";
-  const loadingText = isEditMode ? "Updating..." : "Adding...";
 
   useEffect(() => {
-    if (isOpen) {
-      fetchUsers();
-      fetchCourses();
-      if (isEditMode && certificateId) {
-        fetchCertificate();
-      } else if (!isEditMode) {
-        form.resetFields();
-      }
-    }
-  }, [isOpen, certificateId, isEditMode]);
+    if (!isOpen) return;
 
-  const fetchUsers = async () => {
-    try {
-      const result = await adminService.getAllUsers();
-      if (result.success) {
-        setUsers(result.data);
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    }
-  };
+    const loadData = async () => {
+      setDataReady(false);
+      try {
+        const [usersRes, coursesRes] = await Promise.all([
+          adminService.getAllUsers(),
+          api.get('/api/courses'),
+        ]);
+        if (usersRes.success) setUsers(usersRes.data);
+        const courseList = Array.isArray(coursesRes.data) ? coursesRes.data : coursesRes.data?.data || [];
+        setCourses(courseList);
 
-  const fetchCourses = async () => {
-    try {
-      const { data } = await api.get('/api/courses');
-      setCourses(Array.isArray(data) ? data : data.data || []);
-    } catch (err) {
-      console.error('Error fetching courses:', err);
-    }
-  };
-
-  const fetchCertificate = async () => {
-    setFetchingData(true);
-    try {
-      const result = await certificateService.getCertificateById(certificateId);
-      if (result.success) {
-        const cert = result.data;
-        form.setFieldsValue({
-          userId: String(cert.user_id),
-          courseId: String(cert.course_id),
-          certificateUrl: cert.certificate_url || "",
-          status: cert.status,
-        });
-      } else {
-        message.error(result.error);
-        onClose();
+        if (isEditMode && certificateData) {
+          form.setFieldsValue({
+            userId: String(certificateData.user_id),
+            courseId: String(certificateData.course_id),
+            certificateUrl: certificateData.certificate_url || '',
+            status: certificateData.status,
+          });
+        } else {
+          form.resetFields();
+        }
+      } catch (err) {
+        console.error('Error loading modal data:', err);
+      } finally {
+        setDataReady(true);
       }
-    } catch {
-      message.error("Failed to fetch certificate data");
-      onClose();
-    } finally {
-      setFetchingData(false);
-    }
-  };
+    };
+
+    loadData();
+  }, [isOpen, certificateData, isEditMode]);
 
   const handleSubmit = async (values) => {
     setLoading(true);
@@ -111,18 +86,17 @@ function CertificateModal({ isOpen, onClose, onSuccess, certificateId = null, mo
 
   return (
     <Modal
-      title={modalTitle}
+      title={isEditMode ? "Edit Certificate" : "Add New Certificate"}
       open={isOpen}
       onCancel={handleCancel}
       footer={null}
       width={500}
-      className="custom-modal"
-      destroyOnHidden
+      destroyOnHidden={false}
     >
-      {fetchingData ? (
+      {!dataReady ? (
         <div className="flex justify-center items-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
-          <span className="ml-3 text-gray-600">Loading certificate data...</span>
+          <span className="ml-3 text-gray-600">Loading...</span>
         </div>
       ) : (
         <Form
@@ -221,10 +195,10 @@ function CertificateModal({ isOpen, onClose, onSuccess, certificateId = null, mo
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {loadingText}
+                  {isEditMode ? "Updating..." : "Adding..."}
                 </>
               ) : (
-                submitButtonText
+                isEditMode ? "Update Certificate" : "Add Certificate"
               )}
             </button>
           </div>

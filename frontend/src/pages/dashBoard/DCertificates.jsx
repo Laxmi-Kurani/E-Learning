@@ -69,11 +69,11 @@ function DCertificates() {
   };
 
   const openEditCertificate = (cert) => {
-    setCertificateModal({ isOpen: true, mode: 'edit', certificateId: cert.id });
+    setCertificateModal({ isOpen: true, mode: 'edit', certificateId: cert.id, certificate: cert });
   };
 
   const closeCertificateModal = () => {
-    setCertificateModal({ isOpen: false, mode: 'add', certificateId: null });
+    setCertificateModal({ isOpen: false, mode: 'add', certificateId: null, certificate: null });
   };
 
   const handleCertificateSuccess = () => {
@@ -370,6 +370,7 @@ function DCertificates() {
         isOpen={certificateModal.isOpen}
         mode={certificateModal.mode}
         certificateId={certificateModal.certificateId}
+        certificateData={certificateModal.certificate}
         onClose={closeCertificateModal}
         onSuccess={handleCertificateSuccess}
       />
