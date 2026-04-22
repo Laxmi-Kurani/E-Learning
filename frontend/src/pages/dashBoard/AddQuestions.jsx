@@ -1,24 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Card, 
-  Form, 
-  Input, 
-  Select, 
-  Button, 
-  Typography, 
-  message, 
-  Row, 
+import { useNavigate } from 'react-router-dom';
+import {
+  Card,
+  Form,
+  Input,
+  Select,
+  Button,
+  Typography,
+  message,
+  Row,
   Col,
-  Divider,
   Table,
   Modal,
   Popconfirm
 } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faQuestionCircle, 
-  faArrowLeft, 
+import {
+  faQuestionCircle,
+  faArrowLeft,
   faPlus,
   faEdit,
   faTrash,
@@ -27,22 +26,88 @@ import {
 import { adminService } from '../../api/admin.service';
 import { questionService } from '../../api/question.service';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
+// Defined OUTSIDE the parent component so React doesn't remount it on every render
+const QuestionForm = ({ form, onFinish, loading, submitText, onClose }) => (
+  <Form form={form} layout="vertical" onFinish={onFinish} size="large">
+    <Form.Item
+      label="Question"
+      name="question"
+      rules={[
+        { required: true, message: 'Please enter the question' },
+        { min: 10, message: 'Question must be at least 10 characters' },
+        { max: 500, message: 'Question cannot exceed 500 characters' },
+      ]}
+    >
+      <TextArea placeholder="Enter your question here..." rows={3} showCount maxLength={500} />
+    </Form.Item>
+
+    <Row gutter={16}>
+      <Col span={12}>
+        <Form.Item label="Option A" name="option1" rules={[{ required: true, message: 'Option A is required' }]}>
+          <Input placeholder="Enter option A" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="Option B" name="option2" rules={[{ required: true, message: 'Option B is required' }]}>
+          <Input placeholder="Enter option B" />
+        </Form.Item>
+      </Col>
+    </Row>
+
+    <Row gutter={16}>
+      <Col span={12}>
+        <Form.Item label="Option C" name="option3" rules={[{ required: true, message: 'Option C is required' }]}>
+          <Input placeholder="Enter option C" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="Option D" name="option4" rules={[{ required: true, message: 'Option D is required' }]}>
+          <Input placeholder="Enter option D" />
+        </Form.Item>
+      </Col>
+    </Row>
+
+    <Form.Item
+      label="Correct Answer"
+      name="answer"
+      rules={[{ required: true, message: 'Please select the correct answer' }]}
+    >
+      <Select placeholder="Select the correct answer">
+        <Option value="option1">Option A</Option>
+        <Option value="option2">Option B</Option>
+        <Option value="option3">Option C</Option>
+        <Option value="option4">Option D</Option>
+      </Select>
+    </Form.Item>
+
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+      <Button onClick={onClose}>Cancel</Button>
+      <Button type="primary" htmlType="submit" loading={loading}>
+        {submitText}
+      </Button>
+    </div>
+  </Form>
+);
+
+// Maps option key (option1-4) → letter (A-D)
+const optionToLetter = { option1: 'A', option2: 'B', option3: 'C', option4: 'D' };
+// Maps letter (A-D) → option key (option1-4)
+const letterToOption = { A: 'option1', B: 'option2', C: 'option3', D: 'option4' };
+
 function AddQuestion({ courseId, onBack }) {
-  const location = useLocation();
-  const navigate = useNavigate();
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false); // New state for Add Modal
-  const [editForm] = Form.useForm();
-  
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+
   useEffect(() => {
     fetchQuestions();
   }, [courseId]);
@@ -50,52 +115,32 @@ function AddQuestion({ courseId, onBack }) {
   const fetchQuestions = async () => {
     setLoadingQuestions(true);
     try {
-      console.log('Fetching questions for courseId:', courseId);
       const result = await questionService.getQuestionsByCourse(courseId);
-      console.log('Questions fetch result:', result);
-      
       if (result.success) {
         setQuestions(result.data);
-        console.log('Questions loaded:', result.data.length);
       } else {
-        console.error('Failed to fetch questions:', result.error);
         message.error(result.error || 'Failed to fetch questions');
       }
-    } catch (error) {
-      console.error('Exception fetching questions:', error);
+    } catch {
       message.error('Failed to fetch questions');
     } finally {
       setLoadingQuestions(false);
     }
   };
 
-  const getActualAnswerValue = (values, selectedAnswer) => {
-    // Map option1-4 to A-D letters
-    const answerMap = {
-      'option1': 'A',
-      'option2': 'B',
-      'option3': 'C',
-      'option4': 'D'
-    };
-    return answerMap[selectedAnswer];
-  };
-
+  // CREATE
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      const actualAnswerValue = getActualAnswerValue(values, values.answer);
-      
-      const questionData = {
+      const result = await adminService.createQuestion({
         question: values.question,
         option1: values.option1,
         option2: values.option2,
         option3: values.option3,
         option4: values.option4,
-        answer: actualAnswerValue,
-        courseId: courseId
-      };
-
-      const result = await adminService.createQuestion(questionData);
+        answer: optionToLetter[values.answer], // e.g. "option2" → "B"
+        courseId,
+      });
 
       if (result.success) {
         message.success('Question added successfully!');
@@ -105,53 +150,40 @@ function AddQuestion({ courseId, onBack }) {
       } else {
         message.error(result.error || 'Failed to add question');
       }
-    } catch (error) {
+    } catch {
       message.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
+  // Open edit modal and pre-fill form
   const handleEdit = (question) => {
     setEditingQuestion(question);
-    
-    // Map A-D letters to option1-4
-    const answerMap = {
-      'A': 'option1',
-      'B': 'option2',
-      'C': 'option3',
-      'D': 'option4'
-    };
-    const selectedAnswer = answerMap[question.answer] || 'option1';
-    
     editForm.setFieldsValue({
       question: question.question,
       option1: question.option1,
       option2: question.option2,
       option3: question.option3,
       option4: question.option4,
-      answer: selectedAnswer
+      answer: letterToOption[question.answer] || 'option1', // e.g. "B" → "option2"
     });
     setIsEditModalVisible(true);
   };
 
+  // UPDATE
   const handleEditSubmit = async (values) => {
     if (!editingQuestion) return;
-    
     try {
-      const actualAnswerValue = getActualAnswerValue(values, values.answer);
-      
-      const questionData = {
+      const result = await adminService.updateQuestion(editingQuestion.id, {
         question: values.question,
         option1: values.option1,
         option2: values.option2,
         option3: values.option3,
         option4: values.option4,
-        answer: actualAnswerValue,
-        courseId: courseId
-      };
-
-      const result = await adminService.updateQuestion(editingQuestion.id, questionData);
+        answer: optionToLetter[values.answer], // e.g. "option3" → "C"
+        courseId,
+      });
 
       if (result.success) {
         message.success('Question updated successfully!');
@@ -162,11 +194,12 @@ function AddQuestion({ courseId, onBack }) {
       } else {
         message.error(result.error || 'Failed to update question');
       }
-    } catch (error) {
+    } catch {
       message.error('An unexpected error occurred');
     }
   };
 
+  // DELETE
   const handleDelete = async (questionId) => {
     try {
       const result = await adminService.deleteQuestion(questionId);
@@ -176,13 +209,9 @@ function AddQuestion({ courseId, onBack }) {
       } else {
         message.error(result.error || 'Failed to delete question');
       }
-    } catch (error) {
+    } catch {
       message.error('An unexpected error occurred');
     }
-  };
-
-  const handleCancel = () => {
-    navigate(-1);
   };
 
   const columns = [
@@ -190,61 +219,52 @@ function AddQuestion({ courseId, onBack }) {
       title: 'Question',
       dataIndex: 'question',
       key: 'question',
-      width: '60%',
-      render: (text) => (
-        <div>
-          <Text strong>{text}</Text>
-        </div>
-      ),
+      width: '55%',
+      render: (text) => <span style={{ color: '#111827', fontWeight: 500 }}>{text}</span>,
     },
     {
       title: 'Options',
       key: 'options',
       width: '25%',
-      render: (_, record) => {
-        return (
-          <div className="flex gap-2">
-            {['option1', 'option2', 'option3', 'option4'].map((opt, idx) => (
-              <Button
-                key={opt}
-                type="default"
-                size="small"
-                className="px-3 py-1 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-blue-100 border-gray-300"
-                title={record[opt]}
-              >
-                {String.fromCharCode(65 + idx)}
-              </Button>
-            ))}
-          </div>
-        );
-      },
+      render: (_, record) => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['option1', 'option2', 'option3', 'option4'].map((opt, idx) => (
+            <Button
+              key={opt}
+              type={record.answer === String.fromCharCode(65 + idx) ? 'primary' : 'default'}
+              size="small"
+              title={record[opt]}
+            >
+              {String.fromCharCode(65 + idx)}
+            </Button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      title: 'Correct',
+      key: 'correct',
+      width: '10%',
+      render: (_, record) => (
+        <span style={{ color: '#16a34a', fontWeight: 600 }}>{record.answer}</span>
+      ),
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: '15%',
+      width: '10%',
       render: (_, record) => (
-        <div className="flex gap-2">
-          <Button
-            type="text"
-            size="small"
-            onClick={() => handleEdit(record)}
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-          >
+        <div style={{ display: 'flex', gap: 4 }}>
+          <Button type="text" size="small" onClick={() => handleEdit(record)} style={{ color: '#2563eb' }}>
             <FontAwesomeIcon icon={faEdit} />
           </Button>
           <Popconfirm
-            title="Delete Question"
-            description="Are you sure you want to delete this question?"
+            title="Delete this question?"
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
           >
-            <Button
-              type="text"
-              size="small"
-              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-            >
+            <Button type="text" size="small" style={{ color: '#dc2626' }}>
               <FontAwesomeIcon icon={faTrash} />
             </Button>
           </Popconfirm>
@@ -253,156 +273,26 @@ function AddQuestion({ courseId, onBack }) {
     },
   ];
 
-  const QuestionForm = ({ form, onFinish, loading, submitText, initialValues }) => (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={onFinish}
-      size="large"
-      className="space-y-4"
-      initialValues={initialValues}
-    >
-      <Form.Item
-        label="Question"
-        name="question"
-        rules={[
-          { required: true, message: 'Please enter the question' },
-          { min: 10, message: 'Question must be at least 10 characters' },
-          { max: 500, message: 'Question cannot exceed 500 characters' }
-        ]}
-      >
-        <TextArea
-          placeholder="Enter your question here..."
-          rows={3}
-          className="rounded-lg"
-          showCount
-          maxLength={500}
-        />
-      </Form.Item>
-
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            label="Option A"
-            name="option1"
-            rules={[
-              { required: true, message: 'Option A is required' },
-              { max: 200, message: 'Option cannot exceed 200 characters' }
-            ]}
-          >
-            <Input placeholder="Enter option A" className="rounded-lg" />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            label="Option B"
-            name="option2"
-            rules={[
-              { required: true, message: 'Option B is required' },
-              { max: 200, message: 'Option cannot exceed 200 characters' }
-            ]}
-          >
-            <Input placeholder="Enter option B" className="rounded-lg" />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            label="Option C"
-            name="option3"
-            rules={[
-              { required: true, message: 'Option C is required' },
-              { max: 200, message: 'Option cannot exceed 200 characters' }
-            ]}
-          >
-            <Input placeholder="Enter option C" className="rounded-lg" />
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            label="Option D"
-            name="option4"
-            rules={[
-              { required: true, message: 'Option D is required' },
-              { max: 200, message: 'Option cannot exceed 200 characters' }
-            ]}
-          >
-            <Input placeholder="Enter option D" className="rounded-lg" />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Form.Item
-        label="Correct Answer"
-        name="answer"
-        rules={[{ required: true, message: 'Please select the correct answer' }]}
-      >
-        <Select placeholder="Select the correct answer" className="rounded-lg">
-          <Option value="option1">Option A</Option>
-          <Option value="option2">Option B</Option>
-          <Option value="option3">Option C</Option>
-          <Option value="option4">Option D</Option>
-        </Select>
-      </Form.Item>
-
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <Button
-          onClick={() => {
-            if (submitText.includes('Add')) {
-              setIsAddModalVisible(false);
-            } else {
-              setIsEditModalVisible(false);
-              setEditingQuestion(null);
-              editForm.resetFields();
-            }
-          }}
-          className="rounded-lg px-6"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={loading}
-          className="bg-blue-600 hover:bg-blue-700 rounded-lg px-6"
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          {submitText}
-        </Button>
-      </div>
-    </Form>
-  );
-
   return (
     <div>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <Card className="mb-6 rounded-2xl shadow-sm border-gray-100">
+        <Card className="mb-6 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                type="text"
-                onClick={onBack}
-                className="rounded-xl px-3 py-2 flex items-center gap-2 text-gray-600 hover:text-gray-800 font-medium"
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
+              <Button type="text" onClick={onBack}>
+                <FontAwesomeIcon icon={faArrowLeft} className="mr-2" />
                 Back
               </Button>
-              <div>
-                <Title level={2} className="!mb-0 !text-gray-900">
-                  <FontAwesomeIcon icon={faQuestionCircle} className="mr-3 text-blue-600" />
-                  Question Management
-                </Title>
-              </div>
+              <Title level={3} className="!mb-0">
+                <FontAwesomeIcon icon={faQuestionCircle} className="mr-2 text-blue-600" />
+                Question Management
+              </Title>
             </div>
-            {/* Add Question Button */}
             <Button
               type="primary"
               size="large"
-              onClick={() => setIsAddModalVisible(true)}
-              className="bg-blue-600 hover:bg-blue-700 rounded-lg px-6 h-12 font-semibold"
+              onClick={() => { form.resetFields(); setIsAddModalVisible(true); }}
             >
               <FontAwesomeIcon icon={faPlus} className="mr-2" />
               Add New Question
@@ -410,89 +300,62 @@ function AddQuestion({ courseId, onBack }) {
           </div>
         </Card>
 
-        {/* Questions List - Now Full Width */}
-        <Card className="rounded-2xl shadow-sm border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <Title level={3} className="!mb-0 !text-gray-800">
-              <FontAwesomeIcon icon={faList} className="mr-2 text-green-600" />
-              Existing Questions ({questions.length})
-            </Title>
-          </div>
-
+        {/* Questions Table */}
+        <Card className="rounded-2xl shadow-sm">
+          <Title level={4} className="!mb-4">
+            <FontAwesomeIcon icon={faList} className="mr-2 text-green-600" />
+            Existing Questions ({questions.length})
+          </Title>
           <Table
             columns={columns}
             dataSource={questions}
             rowKey="id"
             loading={loadingQuestions}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: false,
-              className: "mt-4"
-            }}
+            pagination={{ pageSize: 10, showSizeChanger: false }}
+            scroll={{ x: 700 }}
             locale={{
               emptyText: (
-                <div className="py-8 text-center">
-                  <div className="text-gray-400 mb-2">
-                    <FontAwesomeIcon icon={faQuestionCircle} className="text-4xl" />
-                  </div>
-                  <p className="text-gray-600 font-medium mb-2">No questions yet</p>
-                  <p className="text-gray-500 text-sm">Click "Add New Question" to create your first question</p>
+                <div className="py-8 text-center text-gray-500">
+                  No questions yet. Click "Add New Question" to get started.
                 </div>
-              )
+              ),
             }}
-            className="rounded-lg border border-gray-200"
-            scroll={{ x: 800 }}
           />
         </Card>
 
-        {/* Add Question Modal */}
+        {/* Add Modal */}
         <Modal
-          title={
-            <div className="flex items-center gap-3">
-              <FontAwesomeIcon icon={faPlus} className="text-blue-600" />
-              <span>Add New Question</span>
-            </div>
-          }
+          title={<><FontAwesomeIcon icon={faPlus} className="mr-2 text-blue-600" />Add New Question</>}
           open={isAddModalVisible}
-          onCancel={() => {
-            setIsAddModalVisible(false);
-            form.resetFields();
-          }}
+          onCancel={() => { setIsAddModalVisible(false); form.resetFields(); }}
           footer={null}
-          width={800}
-          className="rounded-2xl"
+          width={750}
+          destroyOnHidden
         >
           <QuestionForm
             form={form}
             onFinish={handleSubmit}
             loading={loading}
-            submitText={loading ? 'Adding...' : 'Add Question'}
+            submitText="Add Question"
+            onClose={() => { setIsAddModalVisible(false); form.resetFields(); }}
           />
         </Modal>
 
         {/* Edit Modal */}
         <Modal
-          title={
-            <div className="flex items-center gap-3">
-              <FontAwesomeIcon icon={faEdit} className="text-blue-600" />
-              <span>Edit Question</span>
-            </div>
-          }
+          title={<><FontAwesomeIcon icon={faEdit} className="mr-2 text-blue-600" />Edit Question</>}
           open={isEditModalVisible}
-          onCancel={() => {
-            setIsEditModalVisible(false);
-            setEditingQuestion(null);
-            editForm.resetFields();
-          }}
+          onCancel={() => { setIsEditModalVisible(false); setEditingQuestion(null); editForm.resetFields(); }}
           footer={null}
-          width={800}
-          className="rounded-2xl"
+          width={750}
+          destroyOnHidden={false}
         >
           <QuestionForm
             form={editForm}
             onFinish={handleEditSubmit}
             loading={false}
             submitText="Update Question"
+            onClose={() => { setIsEditModalVisible(false); setEditingQuestion(null); editForm.resetFields(); }}
           />
         </Modal>
       </div>

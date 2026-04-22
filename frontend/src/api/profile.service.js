@@ -66,20 +66,19 @@ async function updateUser(userId, updatedData) {
 
 async function uploadProfileImage(userId, file) {
   try {
-    const formData = new FormData();
-    formData.append('profileImage', file);
-
-    const { data } = await api.post(`/api/users/profile/upload-image`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Convert file to base64 and send as JSON — avoids multipart/form-data issues
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result); // result is "data:image/...;base64,..."
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
 
-    console.log('Upload response:', data);
+    const { data } = await api.post(`/api/users/profile/upload-image`, { imageData: base64 });
     return { success: true, data };
   } catch (err) {
     console.error('Error uploading profile image:', err);
-    return { success: false, error: 'Unable to upload image' };
+    return { success: false, error: err.response?.data?.message || 'Unable to upload image' };
   }
 }
 
