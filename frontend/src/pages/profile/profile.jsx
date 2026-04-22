@@ -59,29 +59,24 @@ function Profile() {
 
           // Normalize profile image path for rendering
           let profileImg = userRes.data.profile_image;
-          console.log('Profile image from API:', profileImg);
           
           if (profileImg && profileImg.trim()) {
             const normalizedImg = profileImg.startsWith('data:image/')
               ? profileImg
               : toAbsoluteImageUrl(profileImg);
-            console.log('Normalized image URL:', normalizedImg);
             setProfileImage(normalizedImg);
             localStorage.setItem("profileImage", normalizedImg);
             setLoadingImage(false);
           } else {
-            console.log('No profile image in user data, trying fallback endpoint...');
             // Fallback: use /api/users/:id/profile-image endpoint if available
             try {
               const imgRes = await profileService.getProfileImage(id);
               if (imgRes.success && imgRes.data) {
-                console.log('Fallback image loaded:', imgRes.data);
                 setProfileImage(imgRes.data);
                 localStorage.setItem("profileImage", imgRes.data);
               }
               setLoadingImage(false);
             } catch (lookupErr) {
-              console.warn('Profile image fallback failed', lookupErr);
               setLoadingImage(false);
             }
           }
@@ -144,47 +139,23 @@ function Profile() {
 
   // Step 2 – user clicks "Save Photo" → upload to API
   const handleSavePhoto = async () => {
-    if (!pendingFile) {
-      alert('Please select a photo first');
-      return;
-    }
+    if (!pendingFile) return;
     
     setIsSaving(true);
-    setLoadingImage(true);
-    console.log('Starting photo upload for file:', pendingFile.name);
 
     try {
       const res = await profileService.uploadProfileImage(id, pendingFile);
-      console.log('Upload response:', res);
       
       if (!res.success) {
-        console.error('Upload failed', res.error);
         alert('Failed to upload image. Please try again.');
         return;
       }
 
-      // refresh user after saved image
-      console.log('Refetching user details after successful upload...');
-      const userRes = await profileService.getUserDetails(id);
-      console.log('User details response:', userRes);
-      
-      if (userRes.success && userRes.data) {
-        setUserDetails(userRes.data);
-        
-        const newImageRaw = userRes.data.profile_image;
-        console.log('New profile_image from API:', newImageRaw);
-        
-        if (newImageRaw && newImageRaw.trim()) {
-          const newImage = newImageRaw.startsWith('data:image/')
-            ? newImageRaw
-            : toAbsoluteImageUrl(newImageRaw);
-          console.log('Normalized new image URL:', newImage);
-          setProfileImage(newImage);
-          localStorage.setItem('profileImage', newImage);
-          alert('Photo saved successfully!');
-        } else {
-          console.warn('profile_image is empty or null after upload');
-        }
+      // Use the returned image data directly - no need to re-fetch
+      const savedImage = res.data?.profile_image;
+      if (savedImage) {
+        setProfileImage(savedImage);
+        localStorage.setItem('profileImage', savedImage);
       }
       
       setPendingFile(null);
@@ -193,8 +164,6 @@ function Profile() {
       alert('Failed to upload image. Please try again.');
     } finally {
       setIsSaving(false);
-      setLoadingImage(false);
-      console.log('Photo save process completed');
     }
   };
 

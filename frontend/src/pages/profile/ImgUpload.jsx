@@ -12,7 +12,6 @@ const ImgUpload = ({ src, isLoading, pendingFile, onFileSelect, onSave, onCancel
   } else if (src && typeof src === 'string' && src.trim()) {
     previewSrc = src;
   }
-  console.log('ImgUpload - src:', src, 'previewSrc:', previewSrc);
 
   return (
     <div className="flex flex-col items-center gap-3">

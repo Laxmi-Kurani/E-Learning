@@ -2,13 +2,7 @@ import api from "./api";
 
 async function getUserDetails(userId) {
   try {
-    // Use /profile endpoint which gets user from token
     const { data } = await api.get(`/api/users/profile`);
-    console.log('DEBUG - getUserDetails response:', {
-      hasProfileImage: !!data.profile_image,
-      imageLength: data.profile_image ? data.profile_image.length : 0,
-      imagePreview: data.profile_image ? data.profile_image.substring(0, 100) : 'null'
-    });
     return { success: true, data };
   } catch (err) {
     console.error("Error fetching user details:", err);
@@ -47,8 +41,6 @@ async function getProfileImage(userId) {
     const blobUrl = URL.createObjectURL(blob);
     return { success: true, data: blobUrl };
   } catch (err) {
-    // Profile image not found is expected, return default
-    console.log("Profile image not available, using default", err);
     return { success: false, error: "No profile image" };
   }
 }
@@ -69,17 +61,11 @@ async function uploadProfileImage(userId, file) {
     const formData = new FormData();
     formData.append('profileImage', file);
 
-    const { data } = await api.post(`/api/users/profile/upload-image`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    console.log('Upload response:', data);
+    const { data } = await api.post(`/api/users/profile/upload-image`, formData);
     return { success: true, data };
   } catch (err) {
     console.error('Error uploading profile image:', err);
-    return { success: false, error: 'Unable to upload image' };
+    return { success: false, error: err.response?.data?.message || 'Unable to upload image' };
   }
 }
 
