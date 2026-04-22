@@ -16,7 +16,7 @@ import Assessment from './pages/assessment/Assessment';
 import ErrorPage from './pages/error/ErrorPage';
 import AddQuestions from './pages/dashBoard/AddQuestions';
 import Performance from './pages/profile/Performance';
-import certificate from './pages/assessment/certificate';
+import Certificate from './pages/assessment/certificate';
 import Forum from './pages/course/forum';
 import AdminDashboard from './pages/dashBoard/AdminDashboard';
 
@@ -34,7 +34,7 @@ function App() {
           <Route path='/courses' Component={Courses}></Route>
           <Route path='/course/:id' Component={Course}></Route>
           <Route path='/discussion/:id' Component={Forum}></Route>
-          <Route path='/certificate/:courseId' Component={certificate}></Route>
+          <Route path='/certificate/:courseId' Component={Certificate}></Route>
           <Route path='/assessment/:id' Component={Assessment}></Route>
           <Route path='/profile' Component={Profile}></Route>
           <Route path='/Learnings' Component={Learnings}></Route>

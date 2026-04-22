@@ -36,7 +36,7 @@ const Certificate = () => {
   const userId = localStorage.getItem("id");
   
   const [course, setCourse] = useState({
-    course_name: "",
+    title: "",
     instructor: "",
     description: "",
   });
@@ -135,7 +135,7 @@ const Certificate = () => {
       const y = (pdfHeight - imgHeight) / 2;
 
       pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
-      pdf.save(`${userDetails?.username || 'Certificate'}_${course?.course_name || 'Course'}_Certificate.pdf`);
+      pdf.save(`${userDetails?.username || 'Certificate'}_${course?.title || 'Course'}_Certificate.pdf`);
 
       // Show buttons again
       if (buttonsContainer) {
@@ -150,7 +150,7 @@ const Certificate = () => {
   };
 
   const handleShare = (platform) => {
-    const shareText = `🎉 I just completed ${course?.course_name} and earned my certificate! #Achievement #Learning`;
+    const shareText = `🎉 I just completed ${course?.title} and earned my certificate! #Achievement #Learning`;
     const shareUrl = window.location.href;
     
     const urls = {
@@ -198,7 +198,7 @@ const Certificate = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
       {/* Confetti Effect */}
       {showConfetti && (
-        <Confetti />
+        <Confetti active={showConfetti} />
       )}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -273,9 +273,7 @@ const Certificate = () => {
                 
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mx-auto max-w-2xl border border-green-200">
                   <h3 className="text-3xl font-bold text-transparent bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text">
-                    {course?.course_name?.length > 50 
-                      ? course?.course_name 
-                      : `${course?.course_name} - Complete Course`}
+                    {course?.title || 'Course'}
                   </h3>
                 </div>
 
