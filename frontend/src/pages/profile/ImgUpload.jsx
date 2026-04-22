@@ -1,24 +1,24 @@
-import React, { useRef } from "react";
+import { useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCamera, faUpload, faTimes, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faCamera, faUpload, faTimes } from "@fortawesome/free-solid-svg-icons";
 
 const ImgUpload = ({ src, isLoading, pendingFile, onFileSelect, onSave, onCancel, isSaving }) => {
   const inputRef = useRef(null);
 
-  // Safely determine preview source, handling null/undefined values
-  let previewSrc = null;
-  if (pendingFile) {
-    previewSrc = URL.createObjectURL(pendingFile);
-  } else if (src && typeof src === 'string' && src.trim()) {
-    previewSrc = src;
-  }
+  // pendingFile preview takes priority over saved src
+  const previewSrc = pendingFile
+    ? URL.createObjectURL(pendingFile)
+    : (src && typeof src === 'string' && src.trim() ? src : null);
+
+  // Only show spinner when loading initial image and no preview available
+  const showSpinner = isLoading && !previewSrc;
 
   return (
     <div className="flex flex-col items-center gap-3">
       {/* Avatar circle */}
       <div className="relative w-32 h-32">
         <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-          {isLoading ? (
+          {showSpinner ? (
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-400 border-t-transparent" />
           ) : previewSrc ? (
             <img src={previewSrc} alt="Profile" className="object-cover w-full h-full" />
@@ -27,8 +27,8 @@ const ImgUpload = ({ src, isLoading, pendingFile, onFileSelect, onSave, onCancel
           )}
         </div>
 
-        {/* Camera button overlay */}
-        {!pendingFile && !isLoading && (
+        {/* Camera button — hidden while a file is pending or saving */}
+        {!pendingFile && !isSaving && (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -40,7 +40,7 @@ const ImgUpload = ({ src, isLoading, pendingFile, onFileSelect, onSave, onCancel
         )}
       </div>
 
-      {/* Save / Cancel buttons — only shown when a file is selected */}
+      {/* Save / Cancel — only shown when a file is pending */}
       {pendingFile && (
         <div className="flex gap-2">
           <button
@@ -71,13 +71,12 @@ const ImgUpload = ({ src, isLoading, pendingFile, onFileSelect, onSave, onCancel
       {/* Hidden file input */}
       <input
         ref={inputRef}
-        id="photo-upload"
         type="file"
         accept="image/*"
         onChange={(e) => {
           const file = e.target.files[0];
           if (file) onFileSelect(file);
-          e.target.value = "";          // reset so same file can be re-selected
+          e.target.value = "";
         }}
         className="hidden"
       />

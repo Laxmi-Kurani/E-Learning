@@ -205,7 +205,7 @@ function Courses() {
                     />
                     <div className="absolute top-3 right-3">
                       <span className="bg-white/90 backdrop-blur-sm text-gray-700 px-2 py-1 rounded-full text-xs font-medium">
-                        ${course.price}
+                        ₹{course.price}
                       </span>
                     </div>
                   </div>

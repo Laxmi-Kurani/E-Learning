@@ -2,7 +2,13 @@ import api from "./api";
 
 async function getUserDetails(userId) {
   try {
+    // Use /profile endpoint which gets user from token
     const { data } = await api.get(`/api/users/profile`);
+    console.log('DEBUG - getUserDetails response:', {
+      hasProfileImage: !!data.profile_image,
+      imageLength: data.profile_image ? data.profile_image.length : 0,
+      imagePreview: data.profile_image ? data.profile_image.substring(0, 100) : 'null'
+    });
     return { success: true, data };
   } catch (err) {
     console.error("Error fetching user details:", err);
@@ -41,6 +47,8 @@ async function getProfileImage(userId) {
     const blobUrl = URL.createObjectURL(blob);
     return { success: true, data: blobUrl };
   } catch (err) {
+    // Profile image not found is expected, return default
+    console.log("Profile image not available, using default", err);
     return { success: false, error: "No profile image" };
   }
 }
@@ -58,10 +66,15 @@ async function updateUser(userId, updatedData) {
 
 async function uploadProfileImage(userId, file) {
   try {
-    const formData = new FormData();
-    formData.append('profileImage', file);
+    // Convert file to base64 and send as JSON — avoids multipart/form-data issues
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result); // result is "data:image/...;base64,..."
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
-    const { data } = await api.post(`/api/users/profile/upload-image`, formData);
+    const { data } = await api.post(`/api/users/profile/upload-image`, { imageData: base64 });
     return { success: true, data };
   } catch (err) {
     console.error('Error uploading profile image:', err);

@@ -43,8 +43,8 @@ function DAssessments() {
 
   const fetchAssessments = async () => {
     try {
-      setLoading(true);
-      // use admin service to take advantage of search & filtering
+      // Don't show full-page spinner on refresh — only on initial load
+      if (assessments.length === 0) setLoading(true);
       const params = { page, limit };
       if (filterCourse) params.courseId = filterCourse;
       if (filterStatus) params.status = filterStatus;
@@ -76,11 +76,11 @@ function DAssessments() {
   };
 
   const openEditAssessment = (assessment) => {
-    setAssessmentModal({ isOpen: true, mode: 'edit', assessmentId: assessment.id });
+    setAssessmentModal({ isOpen: true, mode: 'edit', assessmentId: assessment.id, assessment });
   };
 
   const closeAssessmentModal = () => {
-    setAssessmentModal({ isOpen: false, mode: 'add', assessmentId: null });
+    setAssessmentModal({ isOpen: false, mode: 'add', assessmentId: null, assessment: null });
   };
 
   const handleAssessmentSuccess = () => {
@@ -112,14 +112,6 @@ function DAssessments() {
   const getScore = (assessment) => {
     return ((assessment.score / assessment.total_questions) * 100).toFixed(2);
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -296,7 +288,16 @@ function DAssessments() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {assessments.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center">
+                    <div className="flex justify-center items-center gap-3 text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                      Loading assessments...
+                    </div>
+                  </td>
+                </tr>
+              ) : assessments.length > 0 ? (
                 assessments.map((assessment) => {
                   const status = assessment.passed ? 'PASSED' : 'FAILED';
                   const score = getScore(assessment);
@@ -492,6 +493,7 @@ function DAssessments() {
         isOpen={assessmentModal.isOpen}
         mode={assessmentModal.mode}
         assessmentId={assessmentModal.assessmentId}
+        assessmentData={assessmentModal.assessment}
         onClose={closeAssessmentModal}
         onSuccess={handleAssessmentSuccess}
       />

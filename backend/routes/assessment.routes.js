@@ -262,12 +262,17 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
     const db = getPool();
-    const { score, totalQuestions, passed } = req.body;
+    const { userId, courseId, score, totalQuestions, passed } = req.body;
     const fields = [];
     const params = [];
-    if (score != null) { fields.push('score = ?'); params.push(score); }
-    if (totalQuestions != null) { fields.push('total_questions = ?'); params.push(totalQuestions); }
-    if (passed != null) { fields.push('passed = ?'); params.push(passed); }
+    if (userId != null)        { fields.push('user_id = ?');        params.push(userId); }
+    if (courseId != null)      { fields.push('course_id = ?');      params.push(courseId); }
+    if (score != null)         { fields.push('score = ?');          params.push(score); }
+    if (totalQuestions != null){ fields.push('total_questions = ?');params.push(totalQuestions); }
+    if (passed !== undefined && passed !== null) {
+      fields.push('passed = ?');
+      params.push(passed ? 1 : 0);
+    }
     if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
     params.push(req.params.id);
     await db.query(`UPDATE assessment SET ${fields.join(', ')} WHERE id = ?`, params);

@@ -59,24 +59,29 @@ function Profile() {
 
           // Normalize profile image path for rendering
           let profileImg = userRes.data.profile_image;
+          console.log('Profile image from API:', profileImg);
           
           if (profileImg && profileImg.trim()) {
             const normalizedImg = profileImg.startsWith('data:image/')
               ? profileImg
               : toAbsoluteImageUrl(profileImg);
+            console.log('Normalized image URL:', normalizedImg);
             setProfileImage(normalizedImg);
             localStorage.setItem("profileImage", normalizedImg);
             setLoadingImage(false);
           } else {
+            console.log('No profile image in user data, trying fallback endpoint...');
             // Fallback: use /api/users/:id/profile-image endpoint if available
             try {
               const imgRes = await profileService.getProfileImage(id);
               if (imgRes.success && imgRes.data) {
+                console.log('Fallback image loaded:', imgRes.data);
                 setProfileImage(imgRes.data);
                 localStorage.setItem("profileImage", imgRes.data);
               }
               setLoadingImage(false);
             } catch (lookupErr) {
+              console.warn('Profile image fallback failed', lookupErr);
               setLoadingImage(false);
             }
           }
@@ -98,12 +103,16 @@ function Profile() {
   const updateUser = async (updatedData) => {
     try {
       const res = await profileService.updateUser(id, updatedData);
+      if (!res.success) return false;
 
-      setUserDetails(prevDetails => ({
-        ...prevDetails,
-        ...updatedData
-      }));
-
+      // Refresh from server so UI reflects saved values
+      const userRes = await profileService.getUserDetails(id);
+      if (userRes.success) {
+        setUserDetails(userRes.data);
+      } else {
+        // Optimistic fallback
+        setUserDetails(prev => ({ ...prev, ...updatedData }));
+      }
       return true;
     } catch (err) {
       console.error("Error updating user:", err);
@@ -140,24 +149,33 @@ function Profile() {
   // Step 2 – user clicks "Save Photo" → upload to API
   const handleSavePhoto = async () => {
     if (!pendingFile) return;
-    
+
     setIsSaving(true);
 
     try {
       const res = await profileService.uploadProfileImage(id, pendingFile);
-      
+
       if (!res.success) {
-        alert('Failed to upload image. Please try again.');
+        alert(res.error || 'Failed to upload image. Please try again.');
         return;
       }
 
-      // Use the returned image data directly - no need to re-fetch
+      // Use the base64 returned directly from the upload response — no need to re-fetch
       const savedImage = res.data?.profile_image;
       if (savedImage) {
         setProfileImage(savedImage);
-        localStorage.setItem('profileImage', savedImage);
+        try { localStorage.setItem('profileImage', savedImage); } catch (_) { /* quota exceeded — skip */ }
+      } else {
+        // Fallback: re-fetch profile
+        const userRes = await profileService.getUserDetails(id);
+        if (userRes.success && userRes.data?.profile_image) {
+          const img = toAbsoluteImageUrl(userRes.data.profile_image);
+          setProfileImage(img);
+          try { localStorage.setItem('profileImage', img); } catch (_) {}
+          setUserDetails(userRes.data);
+        }
       }
-      
+
       setPendingFile(null);
     } catch (err) {
       console.error('Error saving profile image:', err);
