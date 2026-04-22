@@ -28,7 +28,7 @@ import EditProfileModal from "./EditProfileModal";
 function Profile() {
   const id = localStorage.getItem("id");
   const [userDetails, setUserDetails] = useState(null);
-  const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || "");
+  const [profileImage, setProfileImage] = useState("");
   const [loadingImage, setLoadingImage] = useState(true);
   const [pendingFile, setPendingFile] = useState(null);   // file selected but not yet saved
   const [isSaving, setIsSaving] = useState(false);
@@ -67,7 +67,6 @@ function Profile() {
               : toAbsoluteImageUrl(profileImg);
             console.log('Normalized image URL:', normalizedImg);
             setProfileImage(normalizedImg);
-            localStorage.setItem("profileImage", normalizedImg);
             setLoadingImage(false);
           } else {
             console.log('No profile image in user data, trying fallback endpoint...');
@@ -77,7 +76,6 @@ function Profile() {
               if (imgRes.success && imgRes.data) {
                 console.log('Fallback image loaded:', imgRes.data);
                 setProfileImage(imgRes.data);
-                localStorage.setItem("profileImage", imgRes.data);
               }
               setLoadingImage(false);
             } catch (lookupErr) {
@@ -163,30 +161,16 @@ function Profile() {
         return;
       }
 
-      // refresh user after saved image
-      console.log('Refetching user details after successful upload...');
-      const userRes = await profileService.getUserDetails(id);
-      console.log('User details response:', userRes);
-      
-      if (userRes.success && userRes.data) {
-        setUserDetails(userRes.data);
-        
-        const newImageRaw = userRes.data.profile_image;
-        console.log('New profile_image from API:', newImageRaw);
-        
-        if (newImageRaw && newImageRaw.trim()) {
-          const newImage = newImageRaw.startsWith('data:image/')
-            ? newImageRaw
-            : toAbsoluteImageUrl(newImageRaw);
-          console.log('Normalized new image URL:', newImage);
-          setProfileImage(newImage);
-          localStorage.setItem('profileImage', newImage);
-          alert('Photo saved successfully!');
-        } else {
-          console.warn('profile_image is empty or null after upload');
-        }
+      // Use the image data returned directly from the upload response
+      const savedImage = res.data?.profile_image;
+      if (savedImage && savedImage.trim()) {
+        const normalizedImage = savedImage.startsWith('data:image/')
+          ? savedImage
+          : toAbsoluteImageUrl(savedImage);
+        setProfileImage(normalizedImage);
       }
-      
+
+      alert('Photo saved successfully!');
       setPendingFile(null);
     } catch (err) {
       console.error('Error saving profile image:', err);

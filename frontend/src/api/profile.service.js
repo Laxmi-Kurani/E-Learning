@@ -70,9 +70,7 @@ async function uploadProfileImage(userId, file) {
     formData.append('profileImage', file);
 
     const { data } = await api.post(`/api/users/profile/upload-image`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': undefined },
     });
 
     console.log('Upload response:', data);
