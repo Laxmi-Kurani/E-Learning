@@ -24,7 +24,7 @@ const configs = {
     DB_PORT: '3306',
     DB_USER: 'root',
     DB_PASSWORD: 'your_password',
-    DB_NAME: 'lms_db',
+    DB_NAME: 'lms',
     MONGO_URI: 'mongodb://localhost:27017/lms'
   },
   mongodb: {
@@ -34,7 +34,7 @@ const configs = {
     DB_PORT: '3306',
     DB_USER: 'root',
     DB_PASSWORD: 'your_password',
-    DB_NAME: 'lms_db'
+    DB_NAME: 'lms'
   },
   postgres: {
     DB_TYPE: 'postgres',
@@ -42,7 +42,7 @@ const configs = {
     DB_PORT: '5432',
     DB_USER: 'postgres',
     DB_PASSWORD: 'your_password',
-    DB_NAME: 'lms_db',
+    DB_NAME: 'lms',
     MONGO_URI: 'mongodb://localhost:27017/lms'
   },
   sqlite: {
@@ -52,7 +52,7 @@ const configs = {
     DB_PORT: '3306',
     DB_USER: 'root',
     DB_PASSWORD: 'your_password',
-    DB_NAME: 'lms_db',
+    DB_NAME: 'lms',
     MONGO_URI: 'mongodb://localhost:27017/lms'
   }
 };
