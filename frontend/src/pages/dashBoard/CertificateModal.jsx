@@ -52,10 +52,14 @@ function CertificateModal({ isOpen, onClose, onSuccess, certificateId = null, ce
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
+      // Auto-generate a frontend certificate URL if not provided
+      const certUrl = values.certificateUrl || 
+        `${window.location.origin}/certificate/${values.courseId}?userId=${values.userId}`;
+
       const payload = {
         userId: values.userId,
         courseId: values.courseId,
-        certificateUrl: values.certificateUrl,
+        certificateUrl: certUrl,
         status: values.status,
       };
       let result;
