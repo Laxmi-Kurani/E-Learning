@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../config/database');
+const { DB_TYPE, Assessment, User, Course } = require('../models');
+const { Op } = require('sequelize');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const { getPaginationParams } = require('../utils/helpers');
 

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api/api';
 import certificateService from '../../api/certificate.service';
 import CertificateModal from './CertificateModal';
 import DeleteModal from './DeleteModal';
 
 function DCertificates() {
+  const navigate = useNavigate();
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -332,14 +334,15 @@ function DCertificates() {
                 {selectedCertificate.certificate_url && (
                   <div className="col-span-2">
                     <p className="text-gray-600 text-sm font-medium">Certificate URL</p>
-                    <a
-                      href={selectedCertificate.certificate_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 break-all"
+                    <button
+                      onClick={() => {
+                        setShowModal(false);
+                        navigate(`/certificate/${selectedCertificate.course_id}?userId=${selectedCertificate.user_id}&download=true`);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 break-all text-left underline"
                     >
                       {selectedCertificate.certificate_url}
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -347,12 +350,23 @@ function DCertificates() {
 
             <div className="flex justify-end gap-4">
               {selectedCertificate.status === 'ISSUED' && (
-                <button
-                  onClick={() => handleRevoke(selectedCertificate.id)}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-                >
-                  Revoke Certificate
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      setShowModal(false);
+                      navigate(`/certificate/${selectedCertificate.course_id}?userId=${selectedCertificate.user_id}&download=true`);
+                    }}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+                  >
+                    View & Download
+                  </button>
+                  <button
+                    onClick={() => handleRevoke(selectedCertificate.id)}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                  >
+                    Revoke Certificate
+                  </button>
+                </>
               )}
               <button
                 onClick={() => setShowModal(false)}

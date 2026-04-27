@@ -103,6 +103,7 @@ app.use('/api/certificates', require('./routes/certificate.routes'));
 app.use('/api/categories', require('./routes/category.routes'));
 app.use('/api/analytics', require('./routes/analytics.routes'));
 app.use('/api/notifications', require('./routes/notification.routes'));
+app.use('/api/chatbot', require('./routes/chatbot.routes'));
 
 // Health check
 app.get('/api/health', (req, res) => {
