@@ -278,7 +278,7 @@ const Certificate = () => {
 
               {/* Certificate Title */}
               <div className="mb-8">
-                <h1 className="text-5xl font-bold text-transparent bg-gradient-to-r from-yellow-600 via-yellow-500 to-orange-500 bg-clip-text mb-4">
+                <h1 className="text-5xl font-bold mb-4" style={{ color: '#d97706' }}>
                   Certificate of Achievement
                 </h1>
                 <div className="flex items-center justify-center gap-2 mb-4">
@@ -294,7 +294,7 @@ const Certificate = () => {
                   This is to proudly certify that
                 </p>
                 
-                <h2 className="text-4xl font-bold text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text py-2">
+                <h2 className="text-4xl font-bold py-2" style={{ color: '#4f46e5' }}>
                   {userDetails?.username || "Student"}
                 </h2>
                 
@@ -303,7 +303,7 @@ const Certificate = () => {
                 </p>
                 
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mx-auto max-w-2xl border border-green-200">
-                  <h3 className="text-3xl font-bold text-transparent bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text">
+                  <h3 className="text-3xl font-bold" style={{ color: '#059669' }}>
                     {course?.title || 'Course'}
                   </h3>
                 </div>
