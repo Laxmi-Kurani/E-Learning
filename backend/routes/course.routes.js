@@ -1,13 +1,35 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../config/database');
+const { DB_TYPE, Course } = require('../models');
+const { Op } = require('sequelize');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // Get all courses
 router.get('/', async (req, res) => {
   try {
-    const db = getPool();
     const { search, category, instructor } = req.query;
+    
+    if (DB_TYPE === 'sqlite') {
+      const whereClause = {};
+      if (search) {
+        whereClause[Op.or] = [
+          { title: { [Op.like]: `%${search}%` } },
+          { description: { [Op.like]: `%${search}%` } },
+          { instructor: { [Op.like]: `%${search}%` } }
+        ];
+      }
+      if (category) whereClause.category = category;
+      if (instructor) whereClause.instructor = instructor;
+      
+      const courses = await Course.findAll({
+        where: whereClause,
+        order: [['created_at', 'DESC']]
+      });
+      return res.json(courses);
+    }
+    
+    const db = getPool();
     let sql = 'SELECT * FROM course';
     const params = [];
     const conditions = [];
@@ -31,6 +53,12 @@ router.get('/', async (req, res) => {
 // Get course by ID
 router.get('/:id', async (req, res) => {
   try {
+    if (DB_TYPE === 'sqlite') {
+      const course = await Course.findByPk(req.params.id);
+      if (!course) return res.status(404).json({ message: 'Course not found' });
+      return res.json(course);
+    }
+    
     const db = getPool();
     const [courses] = await db.query('SELECT * FROM course WHERE id = ?', [req.params.id]);
     if (courses.length === 0) return res.status(404).json({ message: 'Course not found' });
@@ -43,8 +71,26 @@ router.get('/:id', async (req, res) => {
 // Create course (Admin only)
 router.post('/', verifyToken, isAdmin, async (req, res) => {
   try {
-    const db = getPool();
     const { title, description, instructor, duration, level, category, image_url, video_url, price } = req.body;
+    
+    if (DB_TYPE === 'sqlite') {
+      const course = await Course.create({
+        title,
+        description,
+        instructor,
+        duration,
+        level,
+        category,
+        image_url,
+        video_url,
+        price: price || 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      return res.status(201).json({ message: 'Course created successfully', courseId: course.id });
+    }
+    
+    const db = getPool();
     const [result] = await db.query(
       'INSERT INTO course (title, description, instructor, duration, level, category, image_url, video_url, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [title, description, instructor, duration, level, category, image_url, video_url, price || 0]
@@ -58,8 +104,28 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 // Update course (Admin only)
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
-    const db = getPool();
     const { title, description, instructor, duration, level, category, image_url, video_url, price } = req.body;
+    
+    if (DB_TYPE === 'sqlite') {
+      const course = await Course.findByPk(req.params.id);
+      if (!course) return res.status(404).json({ message: 'Course not found' });
+      
+      await course.update({
+        title,
+        description,
+        instructor,
+        duration,
+        level,
+        category,
+        image_url,
+        video_url,
+        price,
+        updated_at: new Date()
+      });
+      return res.json({ message: 'Course updated successfully' });
+    }
+    
+    const db = getPool();
     await db.query(
       'UPDATE course SET title=?, description=?, instructor=?, duration=?, level=?, category=?, image_url=?, video_url=?, price=? WHERE id=?',
       [title, description, instructor, duration, level, category, image_url, video_url, price, req.params.id]
@@ -73,6 +139,14 @@ router.put('/:id', verifyToken, isAdmin, async (req, res) => {
 // Delete course (Admin only)
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
   try {
+    if (DB_TYPE === 'sqlite') {
+      const course = await Course.findByPk(req.params.id);
+      if (!course) return res.status(404).json({ message: 'Course not found' });
+      
+      await course.destroy();
+      return res.json({ message: 'Course deleted successfully' });
+    }
+    
     const db = getPool();
     await db.query('DELETE FROM course WHERE id = ?', [req.params.id]);
     res.json({ message: 'Course deleted successfully' });

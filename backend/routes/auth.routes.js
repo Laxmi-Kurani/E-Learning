@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getPool } = require('../config/database');
+const { DB_TYPE, User } = require('../models');
 const { verifyToken } = require('../middleware/auth');
 
 // Register
@@ -21,6 +22,23 @@ router.post('/register', async (req, res) => {
       github_url 
     } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (DB_TYPE === 'sqlite') {
+      const newUser = await User.create({
+        username,
+        email,
+        password: hashedPassword,
+        mobileNumber: mobileNumber || null,
+        dob: dob || null,
+        gender: gender || null,
+        location: location || null,
+        profession: profession || null,
+        linkedin_url: linkedin_url || null,
+        github_url: github_url || null,
+        role: 'USER'
+      });
+      return res.status(201).json({ message: 'User registered successfully', userId: newUser.id });
+    }
 
     const db = getPool();
     const [result] = await db.query(
@@ -45,9 +63,14 @@ router.post('/login', async (req, res) => {
     
     console.log('Login attempt for:', email);
     
-    const db = getPool();
-    const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
-    const user = users[0];
+    let user;
+    if (DB_TYPE === 'sqlite') {
+      user = await User.findOne({ where: { email } });
+    } else {
+      const db = getPool();
+      const [users] = await db.query('SELECT * FROM user WHERE email = ?', [email]);
+      user = users[0];
+    }
 
     if (!user) {
       console.log('User not found:', email);

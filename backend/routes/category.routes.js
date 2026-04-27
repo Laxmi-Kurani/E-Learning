@@ -1,12 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const { getPool } = require('../config/database');
+const { DB_TYPE, Category } = require('../models');
+const { Op } = require('sequelize');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
 // List categories (optional search)
 router.get('/', async (req, res) => {
   try {
     const { search } = req.query;
+    
+    if (DB_TYPE === 'sqlite') {
+      const whereClause = search ? { name: { [Op.like]: `%${search}%` } } : {};
+      const categories = await Category.findAll({
+        where: whereClause,
+        order: [['name', 'ASC']]
+      });
+      return res.json(categories);
+    }
+    
     const db = getPool();
     
     let query = 'SELECT * FROM category';
@@ -34,6 +46,17 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 
     if (!name) {
       return res.status(400).json({ message: 'Category name is required' });
+    }
+
+    if (DB_TYPE === 'sqlite') {
+      // Check if category already exists
+      const existing = await Category.findOne({ where: { name } });
+      if (existing) {
+        return res.status(400).json({ message: 'Category already exists' });
+      }
+      
+      const newCategory = await Category.create({ name });
+      return res.status(201).json({ message: 'Category created successfully', categoryId: newCategory.id });
     }
 
     const db = getPool();
