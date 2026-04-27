@@ -28,7 +28,7 @@ import EditProfileModal from "./EditProfileModal";
 function Profile() {
   const id = localStorage.getItem("id");
   const [userDetails, setUserDetails] = useState(null);
-  const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || "");
+  const [profileImage, setProfileImage] = useState("");
   const [loadingImage, setLoadingImage] = useState(true);
   const [pendingFile, setPendingFile] = useState(null);   // file selected but not yet saved
   const [isSaving, setIsSaving] = useState(false);
@@ -67,7 +67,6 @@ function Profile() {
               : toAbsoluteImageUrl(profileImg);
             console.log('Normalized image URL:', normalizedImg);
             setProfileImage(normalizedImg);
-            localStorage.setItem("profileImage", normalizedImg);
             setLoadingImage(false);
           } else {
             console.log('No profile image in user data, trying fallback endpoint...');
@@ -77,7 +76,6 @@ function Profile() {
               if (imgRes.success && imgRes.data) {
                 console.log('Fallback image loaded:', imgRes.data);
                 setProfileImage(imgRes.data);
-                localStorage.setItem("profileImage", imgRes.data);
               }
               setLoadingImage(false);
             } catch (lookupErr) {

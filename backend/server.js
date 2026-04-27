@@ -28,33 +28,60 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Initialize database tables
 const initTables = async () => {
   try {
-    // Setup the database pool first
-    await setupPool();
-    const db = getPool();
+    const DB_TYPE = process.env.DB_TYPE || 'mysql';
+    console.log('DB_TYPE:', DB_TYPE);
     
-    const sqlFile = fs.readFileSync(path.join(__dirname, 'config', 'tables.sql'), 'utf8');
-    const statements = sqlFile.split(';').filter(stmt => stmt.trim());
-    
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await db.query(statement);
+    if (DB_TYPE === 'sqlite') {
+      // For SQLite, use Sequelize sync
+      const { sequelize, User } = require('./models');
+      await sequelize.sync({ force: false });
+      console.log('Database tables initialized with Sequelize');
+      
+      // Create default admin user using Sequelize
+      const bcrypt = require('bcryptjs');
+      
+      const existingAdmin = await User.findOne({ where: { email: process.env.ADMIN_EMAIL } });
+      if (!existingAdmin) {
+        const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+        await User.create({
+          username: 'admin',
+          email: process.env.ADMIN_EMAIL,
+          password: hashedPassword,
+          role: 'ADMIN'
+        });
+        console.log('Default admin user created');
+        console.log(`Admin Email: ${process.env.ADMIN_EMAIL}`);
+        console.log(`Admin Password: ${process.env.ADMIN_PASSWORD}`);
       }
-    }
-    
-    console.log('Database tables initialized');
-    
-    // Create default admin user
-    const [users] = await db.query('SELECT * FROM user WHERE email = ?', [process.env.ADMIN_EMAIL]);
-    
-    if (users.length === 0) {
-      const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
-      await db.query(
-        'INSERT INTO user (username, email, password, role) VALUES (?, ?, ?, ?)',
-        ['admin', process.env.ADMIN_EMAIL, hashedPassword, 'ADMIN']
-      );
-      console.log('Default admin user created');
-      console.log(`Admin Email: ${process.env.ADMIN_EMAIL}`);
-      console.log(`Admin Password: ${process.env.ADMIN_PASSWORD}`);
+    } else {
+      // For MySQL, use the existing pool method
+      await setupPool();
+      const db = getPool();
+      
+      const sqlFile = fs.readFileSync(path.join(__dirname, 'config', 'tables.sql'), 'utf8');
+      const statements = sqlFile.split(';').filter(stmt => stmt.trim());
+      
+      for (const statement of statements) {
+        if (statement.trim()) {
+          await db.query(statement);
+        }
+      }
+      
+      console.log('Database tables initialized');
+      
+      // Create default admin user
+      const [users] = await db.query('SELECT * FROM user WHERE email = ?', [process.env.ADMIN_EMAIL]);
+      
+      if (users.length === 0) {
+        const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+        await db.query(
+          'INSERT INTO user (username, email, password, role) VALUES (?, ?, ?, ?)',
+          ['admin', process.env.ADMIN_EMAIL, hashedPassword, 'ADMIN']
+        );
+        console.log('Default admin user created');
+        console.log(`Admin Email: ${process.env.ADMIN_EMAIL}`);
+        console.log(`Admin Password: ${process.env.ADMIN_PASSWORD}`);
+      }
     }
   } catch (error) {
     console.error('Error initializing tables:', error);
@@ -73,6 +100,7 @@ app.use('/api/discussions', require('./routes/discussion.routes'));
 app.use('/api/feedbacks', require('./routes/feedback.routes'));
 app.use('/api/categories', require('./routes/category.routes'));
 app.use('/api/certificates', require('./routes/certificate.routes'));
+app.use('/api/chatbot', require('./routes/chatbot.routes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

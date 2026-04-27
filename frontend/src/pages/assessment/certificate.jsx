@@ -92,6 +92,18 @@ const Certificate = () => {
     fetchData();
   }, [authToken, navigate, userId, courseId]);
 
+  // Auto-download when ?download=true is in the URL
+  useEffect(() => {
+    if (loading) return;
+    if (error) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('download') === 'true') {
+      // Small delay to let the certificate render fully
+      setTimeout(() => handleDownloadPDF(), 800);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error]);
+
   const handleDownloadPDF = async () => {
     setPdfDownloading(true);
     

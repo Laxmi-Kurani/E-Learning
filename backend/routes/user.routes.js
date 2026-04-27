@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const { getPool } = require('../config/database');
+const { DB_TYPE, User, Course, Learning, Assessment, Progress } = require('../models');
+const { Op } = require('sequelize');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const userService = require('../services/userService');
@@ -11,9 +13,33 @@ const userService = require('../services/userService');
 // Get all users (Admin only) with optional filtering/search
 router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
+    const { role, search, isActive } = req.query;
+    
+    if (DB_TYPE === 'sqlite') {
+      // Use Sequelize for SQLite
+      const whereClause = {};
+      if (role) whereClause.role = role;
+      if (isActive !== undefined) {
+        whereClause.isActive = isActive === 'true' || isActive === '1';
+      }
+      if (search) {
+        whereClause[Op.or] = [
+          { username: { [Op.like]: `%${search}%` } },
+          { email: { [Op.like]: `%${search}%` } }
+        ];
+      }
+      
+      const users = await User.findAll({
+        where: whereClause,
+        attributes: ['id', 'username', 'email', 'role', 'isActive', 'mobileNumber', 'gender', 'dob', 'profession', 'location', 'linkedin_url', 'github_url', 'profile_image', 'created_at'],
+        order: [['created_at', 'DESC']]
+      });
+      
+      return res.json(users);
+    }
+    
     const db = getPool();
     if (!db) return res.status(500).json({ message: 'Database connection not initialized' });
-    const { role, search, isActive } = req.query;
     let sql = 'SELECT `id`, `username`, `email`, `role`, `isActive`, `mobileNumber`, `gender`, `dob`, `profession`, `location`, `linkedin_url`, `github_url`, `profile_image`, `created_at` FROM `user`';
     const params = [];
     const conditions = [];
@@ -179,6 +205,38 @@ router.put('/change-password', verifyToken, async (req, res) => {
 // Get dashboard statistics (Admin only) - MUST come before /:id route
 router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
   try {
+    if (DB_TYPE === 'sqlite') {
+      // Use Sequelize for SQLite
+      const userCount = await User.count({ where: { role: 'USER' } });
+      const adminCount = await User.count({ where: { role: 'ADMIN' } });
+      const courseCount = await Course.count();
+      const enrollmentCount = await Learning.count({ where: { status: 'APPROVED' } });
+      const pendingCount = await Learning.count({ where: { status: 'PENDING' } });
+      const assessmentCount = await Assessment.count();
+      
+      // For SQLite, recent enrollments (last 7 days) - using date functions
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const recentEnrollments = await Learning.count({
+        where: {
+          enrolled_at: { [Op.gte]: sevenDaysAgo }
+        }
+      });
+      
+      const completionStats = await Progress.count({ where: { completed: true } });
+      
+      return res.json({
+        users: userCount,
+        admins: adminCount,
+        courses: courseCount,
+        enrollments: enrollmentCount,
+        pendingEnrollments: pendingCount,
+        assessments: assessmentCount,
+        recentEnrollments: recentEnrollments,
+        completedCourses: completionStats
+      });
+    }
+    
     const db = getPool();
     if (!db) {
       return res.status(500).json({ message: 'Database connection not initialized' });

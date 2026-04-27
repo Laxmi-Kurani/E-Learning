@@ -29,7 +29,8 @@
     "pg": "^8.11.1",
     "pg-hstore": "^2.3.4",
     "react-bootstrap": "^2.10.10",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "sqlite3": "^5.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

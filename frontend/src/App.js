@@ -1,5 +1,6 @@
 import './App.css';
 import {BrowserRouter , Routes , Route} from 'react-router-dom';
+import ChatBot from './Components/common/ChatBot';
 import Login from './pages/auth/login';
 import Register from './pages/auth/register';
 import ForgotPassword from './pages/auth/forgotPassword';
@@ -45,6 +46,7 @@ function App() {
           <Route path='/Performance' Component={Performance} />
           <Route path='*' Component={ErrorPage}></Route>
         </Routes>
+        <ChatBot />
       </BrowserRouter>
     </div>
   );
