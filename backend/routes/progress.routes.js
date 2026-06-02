@@ -19,6 +19,19 @@ router.get('/:userId/:courseId', verifyToken, async (req, res) => {
 });
 
 // Update video duration
+router.put('/update-duration', verifyToken, async (req, res) => {
+  try {
+    const db = getPool();
+    const { userId, courseId } = req.body;
+    const [existing] = await db.query('SELECT id FROM progress WHERE user_id = ? AND course_id = ?', [userId, courseId]);
+    if (existing.length === 0) {
+      await db.query('INSERT INTO progress (user_id, course_id, completion_percentage, completed) VALUES (?, ?, 0, false)', [userId, courseId]);
+    }
+    res.json({ message: 'Duration updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating duration', error: error.message });
+  }
+});
 router.post('/update-duration', verifyToken, async (req, res) => {
   try {
     const db = getPool();
@@ -34,7 +47,7 @@ router.post('/update-duration', verifyToken, async (req, res) => {
 });
 
 // Update video progress
-router.post('/update-progress', verifyToken, async (req, res) => {
+router.put('/update-progress', verifyToken, async (req, res) => {
   try {
     const db = getPool();
     const { userId, courseId, playedTime, duration } = req.body;
