@@ -2,13 +2,7 @@ import api from "./api";
 
 async function getUserDetails(userId) {
   try {
-    // Use /profile endpoint which gets user from token
     const { data } = await api.get(`/api/users/profile`);
-    console.log('DEBUG - getUserDetails response:', {
-      hasProfileImage: !!data.profile_image,
-      imageLength: data.profile_image ? data.profile_image.length : 0,
-      imagePreview: data.profile_image ? data.profile_image.substring(0, 100) : 'null'
-    });
     return { success: true, data };
   } catch (err) {
     console.error("Error fetching user details:", err);
@@ -47,8 +41,6 @@ async function getProfileImage(userId) {
     const blobUrl = URL.createObjectURL(blob);
     return { success: true, data: blobUrl };
   } catch (err) {
-    // Profile image not found is expected, return default
-    console.log("Profile image not available, using default", err);
     return { success: false, error: "No profile image" };
   }
 }
