@@ -18,7 +18,7 @@ const Course = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [duration, setDuration] = useState(null);
-  const [played, setPlayed] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
   const [changePlayed, setChangePlayed] = useState(0);
   const [progressLoading, setProgressLoading] = useState(true);
   const userId = localStorage.getItem("id");
@@ -55,7 +55,7 @@ const Course = () => {
         setProgressLoading(true);
         const res = await progressService.getProgress(userId, courseId);
         if (res.success) {
-          setPlayed(res.data);
+          setProgressPercent(res.data); // res.data is already 0-100
         }
       } catch (err) {
         console.error("Error fetching progress:", err);
@@ -72,23 +72,17 @@ const Course = () => {
   useEffect(() => {
     const updateProgress = async () => {
       if (courseId && userId && duration) {
-        const res = await progressService.updateProgress(userId, courseId, played, duration);
+        const res = await progressService.updateProgress(userId, courseId, changePlayed, duration);
         if (res.success) {
-          setPlayed(changePlayed < played ? played : changePlayed);
+          const newPct = Math.min(Math.ceil((changePlayed / duration) * 100), 100);
+          setProgressPercent(prev => Math.max(prev, newPct));
         }
       }
     };
     updateProgress();
-  }, [changePlayed, courseId, userId, duration, played]);
+  }, [changePlayed, courseId, userId, duration]);
 
-  const getProgressPercent = () => {
-    if (progressLoading || !duration || duration === 0) {
-      return 0;
-    }
-    return Math.min(Math.ceil((played / duration) * 100), 100);
-  };
-
-  const progressPercent = getProgressPercent();
+  const getProgressPercent = () => progressPercent;
 
   if (loading) return <div className="text-center py-10">Loading...</div>;
   if (error) return <div className="text-center text-red-500 py-10">Something went wrong!</div>;

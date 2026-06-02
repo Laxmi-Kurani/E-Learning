@@ -24,9 +24,22 @@ function ChatBot() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const bottomRef = useRef(null);
 
-  const isAuthenticated = authService.isAuthenticated();
+  // Re-check auth on every focus/storage change (handles login/logout)
+  useEffect(() => {
+    const check = () => setIsAuthenticated(authService.isAuthenticated());
+    window.addEventListener("storage", check);
+    window.addEventListener("focus", check);
+    // Poll every second to catch same-tab login
+    const interval = setInterval(check, 1000);
+    return () => {
+      window.removeEventListener("storage", check);
+      window.removeEventListener("focus", check);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
