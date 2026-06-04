@@ -34,20 +34,21 @@ function Assessment() {
   }, [courseId]);
 
   const handleAnswerChange = (questionId, selectedOption) => {
-    if (isSubmitted) return; // Prevent changes after submission
-    
+    if (isSubmitted) return;
+
     const question = test.find(q => q.id === questionId);
+    const correctOption = { A: question.option1, B: question.option2, C: question.option3, D: question.option4 }[question.answer?.toUpperCase()];
     const prevAnswer = selectedAnswers[questionId];
     const updatedSelectedAnswers = { ...selectedAnswers };
     let scoreChange = 0;
 
     if (prevAnswer === selectedOption) {
       delete updatedSelectedAnswers[questionId];
-      if (question.answer === selectedOption) scoreChange = -1;
+      if (correctOption === selectedOption) scoreChange = -1;
     } else {
       updatedSelectedAnswers[questionId] = selectedOption;
-      if (prevAnswer && question.answer === prevAnswer) scoreChange -= 1;
-      if (question.answer === selectedOption) scoreChange += 1;
+      if (prevAnswer && correctOption === prevAnswer) scoreChange -= 1;
+      if (correctOption === selectedOption) scoreChange += 1;
     }
 
     setSelectedAnswers(updatedSelectedAnswers);
@@ -128,8 +129,9 @@ function Assessment() {
 
               <div className="p-6 space-y-3">
                 {[question.option1, question.option2, question.option3, question.option4].map((option, optionIndex) => {
+                  const correctOption = { A: question.option1, B: question.option2, C: question.option3, D: question.option4 }[question.answer?.toUpperCase()];
                   const isSelected = selectedAnswers[question.id] === option;
-                  const isCorrect = question.answer === option;
+                  const isCorrect = correctOption === option;
                   const isWrong = isSubmitted && isSelected && !isCorrect;
                   const showCorrect = isSubmitted && isCorrect;
                   
