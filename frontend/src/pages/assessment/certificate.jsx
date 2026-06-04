@@ -23,6 +23,21 @@ import seal from '../../assets/images/seal.png';
 import { courseService } from "../../api/course.service";
 import { profileService } from "../../api/profile.service";
 
+// Pre-convert images to base64 to avoid CORS issues in html2canvas
+const toBase64 = (url) => new Promise((resolve) => {
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    canvas.getContext('2d').drawImage(image, 0, 0);
+    resolve(canvas.toDataURL('image/png'));
+  };
+  image.onerror = () => resolve(url); // fallback to original
+  image.src = url;
+});
+
 const Certificate = () => {
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +55,8 @@ const Certificate = () => {
     instructor: "",
     description: "",
   });
+  const [logoSrc, setLogoSrc] = useState(img);
+  const [sealSrc, setSealSrc] = useState(seal);
 
   const certificateNumber = `CERT-${courseId}-${userId}-${Date.now().toString().slice(-6)}`;
   const currentDate = new Date().toLocaleDateString("en-US", {
@@ -81,6 +98,11 @@ const Certificate = () => {
 
         // Show confetti after data loads
         setTimeout(() => setShowConfetti(true), 500);
+
+        // Pre-load images as base64 to avoid CORS issues in html2canvas
+        const [logoB64, sealB64] = await Promise.all([toBase64(img), toBase64(seal)]);
+        setLogoSrc(logoB64);
+        setSealSrc(sealB64);
       } catch (err) {
         console.error("Error fetching data:", err);
         setError("Failed to load certificate data. Please try again.");
@@ -98,65 +120,54 @@ const Certificate = () => {
     if (error) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('download') === 'true') {
-      // Small delay to let the certificate render fully
-      setTimeout(() => handleDownloadPDF(), 800);
+      // Wait for images to be converted to base64 before downloading
+      setTimeout(() => handleDownloadPDF(), 1500);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error]);
+  }, [loading, error, logoSrc, sealSrc]);
 
   const handleDownloadPDF = async () => {
     setPdfDownloading(true);
     
+    const buttonsContainer = document.getElementById("certificate-buttons");
+    
     try {
       const certificateElement = document.getElementById("certificate");
-      
-      if (!certificateElement) {
-        throw new Error("Certificate element not found");
-      }
+      if (!certificateElement) throw new Error("Certificate element not found");
 
-      const buttonsContainer = document.getElementById("certificate-buttons");
-      if (buttonsContainer) {
-        buttonsContainer.style.display = "none";
-      }
+      if (buttonsContainer) buttonsContainer.style.display = "none";
+      await new Promise(r => setTimeout(r, 200));
 
       const canvas = await html2canvas(certificateElement, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff"
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+        imageTimeout: 0,
+        removeContainer: true,
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
       const pdf = new jsPDF("landscape", "mm", "a4");
-      
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgAspectRatio = canvas.width / canvas.height;
-      const pdfAspectRatio = pdfWidth / pdfHeight;
 
-      let imgWidth, imgHeight;
-      if (imgAspectRatio > pdfAspectRatio) {
-        imgWidth = pdfWidth;
-        imgHeight = pdfWidth / imgAspectRatio;
-      } else {
-        imgHeight = pdfHeight;
-        imgWidth = pdfHeight * imgAspectRatio;
-      }
-
-      const x = (pdfWidth - imgWidth) / 2;
-      const y = (pdfHeight - imgHeight) / 2;
-
-      pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
       pdf.save(`${userDetails?.username || 'Certificate'}_${course?.title || 'Course'}_Certificate.pdf`);
 
-      // Show buttons again
-      if (buttonsContainer) {
-        buttonsContainer.style.display = "flex";
-      }
     } catch (err) {
-      console.error("Error generating PDF:", err);
-      alert("Failed to generate PDF. Please try again.");
+      console.error("PDF generation error:", err.message, err.stack);
+      
+      // Fallback: use window.print()
+      try {
+        if (buttonsContainer) buttonsContainer.style.display = "none";
+        window.print();
+      } catch (printErr) {
+        alert("Failed to generate PDF. Please try again.");
+      }
     } finally {
+      if (buttonsContainer) buttonsContainer.style.display = "flex";
       setPdfDownloading(false);
     }
   };
@@ -208,6 +219,14 @@ const Certificate = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #certificate, #certificate * { visibility: visible; }
+          #certificate { position: fixed; left: 0; top: 0; width: 100%; }
+          #certificate-buttons { display: none !important; }
+        }
+      `}</style>
       {/* Confetti Effect */}
       {showConfetti && (
         <Confetti active={showConfetti} />
@@ -251,7 +270,7 @@ const Certificate = () => {
               {/* Logo */}
               <div className="mb-8">
                 <img
-                  src={img}
+                  src={logoSrc}
                   alt="Institution Logo"
                   className="w-48 h-14 mx-auto rounded-full shadow-lg bg-white p-1"
                 />
@@ -317,7 +336,7 @@ const Certificate = () => {
               <div className="flex justify-center items-center">
                 <div className="text-center">
                   <img
-                    src={seal}
+                    src={sealSrc}
                     alt="Official Seal"
                     className="w-32 h-24 mx-auto mb-4 opacity-80"
                   />
@@ -356,6 +375,19 @@ const Certificate = () => {
                   Download Certificate
                 </>
               )}
+            </button>
+
+            <button
+              onClick={() => {
+                const btns = document.getElementById("certificate-buttons");
+                if (btns) btns.style.display = "none";
+                window.print();
+                if (btns) btns.style.display = "flex";
+              }}
+              className="flex items-center gap-3 bg-gray-700 hover:bg-gray-800 text-white px-8 py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <FontAwesomeIcon icon={faDownload} className="text-xl" />
+              Print / Save as PDF
             </button>
 
             <div className="flex gap-2">

@@ -5,8 +5,9 @@ const path = require('path');
 const fileUpload = require('express-fileupload');
 require('dotenv').config();
 
-const { setupPool, getPool } = require('./config/database');
 const bcrypt = require('bcryptjs');
+const { setupPool } = require('./config/database');
+const { sequelize, User, DB_TYPE, mongoose } = require('./models');
 
 const app = express();
 
@@ -26,78 +27,78 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(fileUpload({
-  limits: { fileSize: 7 * 1024 * 1024 }, // 7MB limit
+  limits: { fileSize: 7 * 1024 * 1024 },
   abortOnLimit: true,
   createParentPath: true,
 }));
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Initialize database tables
-const initTables = async () => {
+const initDatabase = async () => {
   try {
-    const DB_TYPE = process.env.DB_TYPE || 'mysql';
-    console.log('DB_TYPE:', DB_TYPE);
-    
-    if (DB_TYPE === 'sqlite') {
-      // For SQLite, use Sequelize sync
-      const { sequelize, User } = require('./models');
-      await sequelize.sync({ force: false });
-      console.log('Database tables initialized with Sequelize');
-      
-      // Create default admin user using Sequelize
-      const bcrypt = require('bcryptjs');
-      
-      const existingAdmin = await User.findOne({ where: { email: process.env.ADMIN_EMAIL } });
-      if (!existingAdmin) {
-        const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
-        await User.create({
+    console.log(`📌 DB_TYPE is set to '${DB_TYPE}'`);
+
+    if (DB_TYPE === 'mongodb') {
+      if (mongoose) {
+        mongoose.connection.on('error', err => console.error('Mongo connection error:', err));
+        mongoose.connection.once('open', () => console.log('✅ Connected to MongoDB'));
+      }
+
+      // Ensure default admin user
+      let admin = await User.findOne({ email: process.env.ADMIN_EMAIL });
+      const hashedEnvPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+      if (!admin) {
+        admin = new User({
           username: 'admin',
           email: process.env.ADMIN_EMAIL,
-          password: hashedPassword,
+          password: hashedEnvPassword,
           role: 'ADMIN'
         });
-        console.log('Default admin user created');
-        console.log(`Admin Email: ${process.env.ADMIN_EMAIL}`);
-        console.log(`Admin Password: ${process.env.ADMIN_PASSWORD}`);
-      }
-    } else {
-      // For MySQL, use the existing pool method
-      await setupPool();
-      const db = getPool();
-      
-      const sqlFile = fs.readFileSync(path.join(__dirname, 'config', 'tables.sql'), 'utf8');
-      const statements = sqlFile.split(';').filter(stmt => stmt.trim());
-      
-      for (const statement of statements) {
-        if (statement.trim()) {
-          await db.query(statement);
+        await admin.save();
+        console.log('✅ Default admin user created');
+      } else {
+        console.log('ℹ️ Admin user already exists');
+        const passwordMatches = await bcrypt.compare(process.env.ADMIN_PASSWORD, admin.password);
+        if (!passwordMatches) {
+          admin.password = hashedEnvPassword;
+          await admin.save();
+          console.log('🔄 Admin password updated to match .env');
         }
       }
-      
-      console.log('Database tables initialized');
-      
-      // Create default admin user
-      const [users] = await db.query('SELECT * FROM user WHERE email = ?', [process.env.ADMIN_EMAIL]);
-      
-      if (users.length === 0) {
-        const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
-        await db.query(
-          'INSERT INTO user (username, email, password, role) VALUES (?, ?, ?, ?)',
-          ['admin', process.env.ADMIN_EMAIL, hashedPassword, 'ADMIN']
-        );
-        console.log('Default admin user created');
-        console.log(`Admin Email: ${process.env.ADMIN_EMAIL}`);
-        console.log(`Admin Password: ${process.env.ADMIN_PASSWORD}`);
+    } else {
+      await setupPool();
+      await sequelize.authenticate();
+      await sequelize.sync({ alter: true });
+      console.log('✅ ORM models synced with database');
+
+      const [admin, created] = await User.findOrCreate({
+        where: { email: process.env.ADMIN_EMAIL },
+        defaults: {
+          username: 'admin',
+          password: await bcrypt.hash(process.env.ADMIN_PASSWORD, 10),
+          role: 'ADMIN'
+        }
+      });
+      if (created) {
+        console.log('✅ Default admin user created');
+      } else {
+        console.log('ℹ️ Admin user already exists');
+        const passwordMatches = await bcrypt.compare(process.env.ADMIN_PASSWORD, admin.password);
+        if (!passwordMatches) {
+          admin.password = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+          await admin.save();
+          console.log('🔄 Admin password updated to match .env');
+        }
       }
     }
   } catch (error) {
-    console.error('Error initializing tables:', error);
+    console.error('Error initializing database:', error);
   }
 };
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/auth/password', require('./routes/passwordReset.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/learning', require('./routes/learning.routes'));
@@ -106,8 +107,10 @@ app.use('/api/questions', require('./routes/question.routes'));
 app.use('/api/assessments', require('./routes/assessment.routes'));
 app.use('/api/discussions', require('./routes/discussion.routes'));
 app.use('/api/feedbacks', require('./routes/feedback.routes'));
-app.use('/api/categories', require('./routes/category.routes'));
 app.use('/api/certificates', require('./routes/certificate.routes'));
+app.use('/api/categories', require('./routes/category.routes'));
+app.use('/api/analytics', require('./routes/analytics.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
 app.use('/api/chatbot', require('./routes/chatbot.routes'));
 
 // Health check
@@ -122,37 +125,27 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5002;
 
 (async () => {
   try {
-    console.log('Starting server...');
-    
-    // Start server first
+    await initDatabase();
+
     const server = app.listen(PORT, () => {
-      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
-      console.log(`📍 Test in browser: http://localhost:${PORT}/api/health`);
     });
 
-    server.on('error', (err) => {
+    server.on('error', err => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use!`);
-        console.error('Try: netstat -ano | findstr :8080');
-        console.error('Or change PORT in .env file');
+        console.error(`❌ Port ${PORT} is already in use. Please stop the other process or set a different PORT in your .env`);
       } else {
         console.error('❌ Server error:', err);
       }
       process.exit(1);
     });
-
-    // Initialize database after server starts
-    console.log('Initializing database...');
-    await initTables();
-    console.log('✅ Database initialization complete');
-    
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error('❌ Failed to start server:', error.message);
     process.exit(1);
   }
 })();

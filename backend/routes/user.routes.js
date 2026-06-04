@@ -3,11 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const { getPool } = require('../config/database');
-const { DB_TYPE, User, Course, Learning, Assessment, Progress } = require('../models');
-const { Op } = require('sequelize');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const userService = require('../services/userService');
+const { DB_TYPE, User } = require('../models');
 
 
 // Get all users (Admin only) with optional filtering/search
@@ -15,27 +14,17 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
   try {
     const { role, search, isActive } = req.query;
     
-    if (DB_TYPE === 'sqlite') {
-      // Use Sequelize for SQLite
-      const whereClause = {};
-      if (role) whereClause.role = role;
-      if (isActive !== undefined) {
-        whereClause.isActive = isActive === 'true' || isActive === '1';
-      }
-      if (search) {
-        whereClause[Op.or] = [
-          { username: { [Op.like]: `%${search}%` } },
-          { email: { [Op.like]: `%${search}%` } }
-        ];
-      }
+    if (DB_TYPE === 'mongodb') {
+      const filter = {};
+      if (role) filter.role = role;
+      if (isActive !== undefined) filter.isActive = isActive === 'true' || isActive === '1';
+      if (search) filter.$or = [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
       
-      const users = await User.findAll({
-        where: whereClause,
-        attributes: ['id', 'username', 'email', 'role', 'isActive', 'mobileNumber', 'gender', 'dob', 'profession', 'location', 'linkedin_url', 'github_url', 'profile_image', 'created_at'],
-        order: [['created_at', 'DESC']]
-      });
-      
-      return res.json(users);
+      const users = await User.find(filter, { password: 0 }).sort({ created_at: -1 }).lean();
+      return res.json(users.map(u => ({ ...u, id: u._id.toString() })));
     }
     
     const db = getPool();
@@ -54,6 +43,7 @@ router.get('/', verifyToken, isAdmin, async (req, res) => {
     const [users] = await db.query(sql, params);
     res.json(users);
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 });
@@ -83,6 +73,7 @@ router.get('/details', verifyToken, async (req, res) => {
 // Normalize profile image URL whether value is data URI, absolute URL, or relative path
 const normalizeProfileImage = (profileImage, req) => {
   if (!profileImage) return null;
+  if (typeof profileImage !== 'string') return null;
   if (profileImage.startsWith('data:image/') || profileImage.startsWith('http://') || profileImage.startsWith('https://') || profileImage.startsWith('blob:')) {
     return profileImage;
   }
@@ -110,13 +101,7 @@ router.get('/profile', verifyToken, async (req, res) => {
     const safeUser = user.toJSON ? user.toJSON() : { ...user };
     delete safeUser.password;
     
-    // Log raw profile_image before normalization
-    console.log('DEBUG - Raw profile_image from DB:', safeUser.profile_image ? safeUser.profile_image.substring(0, 100) : 'NULL');
-    
     safeUser.profile_image = normalizeProfileImage(safeUser.profile_image, req);
-    
-    // Log normalized profile_image
-    console.log('DEBUG - Normalized profile_image:', safeUser.profile_image ? safeUser.profile_image.substring(0, 100) : 'NULL');
 
     return res.json(safeUser);
   } catch (error) {
@@ -145,6 +130,45 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Error creating user', error: error.message });
   }
 });
+
+// Upload profile image
+router.post('/profile/upload-image', verifyToken, async (req, res) => {
+  try {
+    let imageData = null;
+
+    if (req.files && req.files.profileImage) {
+      const file = req.files.profileImage;
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ message: 'Invalid image type. Only JPEG, PNG, GIF, WEBP allowed' });
+      }
+      if (file.size > 7 * 1024 * 1024) {
+        return res.status(400).json({ message: 'Image too large. Maximum size is 7MB' });
+      }
+      imageData = `data:${file.mimetype};base64,${file.data.toString('base64')}`;
+    } else if (req.body.imageData) {
+      imageData = req.body.imageData;
+      if (typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
+        return res.status(400).json({ message: 'Invalid image data format' });
+      }
+    } else {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+
+    if (DB_TYPE === 'mongodb') {
+      await User.findByIdAndUpdate(req.userId, { profile_image: imageData });
+    } else {
+      const db = getPool();
+      await db.query('UPDATE `user` SET `profile_image` = ? WHERE `id` = ?', [imageData, req.userId]);
+    }
+
+    res.json({ success: true, message: 'Profile image uploaded successfully', profile_image: imageData });
+  } catch (error) {
+    console.error('Profile image upload error:', error);
+    res.status(500).json({ message: 'Error uploading profile image', error: error.message });
+  }
+});
+
 // Update user profile (must come before /:id route)
 router.put('/profile', verifyToken, async (req, res) => {
   try {
@@ -205,38 +229,6 @@ router.put('/change-password', verifyToken, async (req, res) => {
 // Get dashboard statistics (Admin only) - MUST come before /:id route
 router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
   try {
-    if (DB_TYPE === 'sqlite') {
-      // Use Sequelize for SQLite
-      const userCount = await User.count({ where: { role: 'USER' } });
-      const adminCount = await User.count({ where: { role: 'ADMIN' } });
-      const courseCount = await Course.count();
-      const enrollmentCount = await Learning.count({ where: { status: 'APPROVED' } });
-      const pendingCount = await Learning.count({ where: { status: 'PENDING' } });
-      const assessmentCount = await Assessment.count();
-      
-      // For SQLite, recent enrollments (last 7 days) - using date functions
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const recentEnrollments = await Learning.count({
-        where: {
-          enrolled_at: { [Op.gte]: sevenDaysAgo }
-        }
-      });
-      
-      const completionStats = await Progress.count({ where: { completed: true } });
-      
-      return res.json({
-        users: userCount,
-        admins: adminCount,
-        courses: courseCount,
-        enrollments: enrollmentCount,
-        pendingEnrollments: pendingCount,
-        assessments: assessmentCount,
-        recentEnrollments: recentEnrollments,
-        completedCourses: completionStats
-      });
-    }
-    
     const db = getPool();
     if (!db) {
       return res.status(500).json({ message: 'Database connection not initialized' });
@@ -283,6 +275,24 @@ router.get('/stats/dashboard', verifyToken, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Dashboard stats error:', error);
     res.status(500).json({ message: 'Error fetching dashboard stats', error: error.message, code: error.code });
+  }
+});
+
+// Get user by ID
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const user = await userService.getUserById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const safeUser = user.toJSON ? user.toJSON() : { ...user };
+    delete safeUser.password;
+    safeUser.profile_image = normalizeProfileImage(safeUser.profile_image, req);
+    res.json(safeUser);
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ message: 'Error fetching user', error: error.message, code: error.code });
   }
 });
 
@@ -333,67 +343,6 @@ router.get('/:id/profile-image', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Profile image fetch error:', error);
     res.status(500).json({ message: 'Error fetching profile image', error: error.message, code: error.code });
-  }
-});
-
-// Get user by ID
-router.get('/:id', verifyToken, async (req, res) => {
-  try {
-    const user = await userService.getUserById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const safeUser = user.toJSON ? user.toJSON() : { ...user };
-    delete safeUser.password;
-    safeUser.profile_image = normalizeProfileImage(safeUser.profile_image, req);
-    res.json(safeUser);
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ message: 'Error fetching user', error: error.message, code: error.code });
-  }
-});
-
-// Upload profile image for current user (token-based)
-router.post('/profile/upload-image', verifyToken, async (req, res) => {
-  try {
-    const db = getPool();
-    if (!db) {
-      return res.status(500).json({ message: 'Database connection not initialized' });
-    }
-
-    let imageData = null;
-
-    if (req.files && req.files.profileImage) {
-      const file = req.files.profileImage;
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.mimetype)) {
-        return res.status(400).json({ message: 'Invalid image type. Only JPEG, PNG, GIF, WEBP allowed' });
-      }
-
-      if (file.size > 7 * 1024 * 1024) {
-        return res.status(400).json({ message: 'Image too large. Maximum size is 7MB' });
-      }
-
-      imageData = `data:${file.mimetype};base64,${file.data.toString('base64')}`;
-    } else if (req.body.imageData) {
-      imageData = req.body.imageData;
-      if (typeof imageData !== 'string' || !imageData.startsWith('data:image/')) {
-        return res.status(400).json({ message: 'Invalid image data format' });
-      }
-      if (imageData.length > 10 * 1024 * 1024) {
-        return res.status(400).json({ message: 'Image too large. Maximum size is 7MB' });
-      }
-    } else {
-      return res.status(400).json({ message: 'No image file or imageData provided' });
-    }
-
-    await db.query('UPDATE `user` SET `profile_image` = ? WHERE `id` = ?', [imageData, req.userId]);
-
-    res.json({ success: true, message: 'Profile image uploaded successfully', profile_image: imageData });
-  } catch (error) {
-    console.error('Profile image upload error:', error);
-    res.status(500).json({ success: false, message: 'Error uploading profile image', error: error.message, code: error.code });
   }
 });
 

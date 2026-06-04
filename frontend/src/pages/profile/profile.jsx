@@ -59,22 +59,18 @@ function Profile() {
 
           // Normalize profile image path for rendering
           let profileImg = userRes.data.profile_image;
-          console.log('Profile image from API:', profileImg);
           
           if (profileImg && profileImg.trim()) {
             const normalizedImg = profileImg.startsWith('data:image/')
               ? profileImg
               : toAbsoluteImageUrl(profileImg);
-            console.log('Normalized image URL:', normalizedImg);
             setProfileImage(normalizedImg);
             setLoadingImage(false);
           } else {
-            console.log('No profile image in user data, trying fallback endpoint...');
             // Fallback: use /api/users/:id/profile-image endpoint if available
             try {
               const imgRes = await profileService.getProfileImage(id);
               if (imgRes.success && imgRes.data) {
-                console.log('Fallback image loaded:', imgRes.data);
                 setProfileImage(imgRes.data);
               }
               setLoadingImage(false);

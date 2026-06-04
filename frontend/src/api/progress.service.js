@@ -14,7 +14,7 @@ async function getProgress(userId, courseId) {
 
 async function updateDuration(userId, courseId, duration) {
   try {
-    await api.put(`/api/progress/update-duration`, { userId, courseId, duration });
+    await api.post(`/api/progress/update-duration`, { userId, courseId, duration });
     return { success: true };
   } catch (err) {
     console.error("Error updating duration:", err);
@@ -24,7 +24,7 @@ async function updateDuration(userId, courseId, duration) {
 
 async function updateProgress(userId, courseId, playedTime, duration) {
   try {
-    await api.put(`/api/progress/update-progress`, { userId, courseId, playedTime, duration });
+    await api.post(`/api/progress/update-progress`, { userId, courseId, playedTime, duration });
     return { success: true };
   } catch (err) {
     console.error("Error updating progress:", err);
